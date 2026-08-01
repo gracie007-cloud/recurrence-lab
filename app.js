@@ -793,6 +793,12 @@
       gapCard +
       backtestCard(bt, "stochastic");
 
+    // Kick off the animated envelope if the shell is present (skipped for
+    // reduced-motion, which renders the static final card instead).
+    if (el.panels.stochastic.querySelector && el.panels.stochastic.querySelector("#envChartWrap")) {
+      startEnvelopeAnimation(el.panels.stochastic);
+    }
+
     var p = $("optPrior");
     var dsl = $("optDecay");
     if (p) {
@@ -936,7 +942,17 @@
 
   /* ---------------- Monte Carlo: observed vs expected ---------------- */
 
+  var envelopeAnim = { raf: null };
+
   function monteCarloEnvelopeCard() {
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      return monteCarloEnvelopeStatic();
+    }
+    return monteCarloEnvelopeAnimatedShell();
+  }
+
+  // Static (final-state) envelope card — used for reduced-motion.
+  function monteCarloEnvelopeStatic() {
     var env = state.envelope;
     if (!env) return "";
     var interp = env.outsideCount <= Math.ceil(env.expectedOutside * 2)
@@ -961,6 +977,30 @@
         '<span><i class="swatch" style="background:#c9d4e4"></i>' + Math.round(env.level * 100) + "% envelope</span>" +
       "</div>" +
       '<div style="margin-top:14px">' + interp + "</div>"
+    );
+  }
+
+  // Shell the animator fills in live.
+  function monteCarloEnvelopeAnimatedShell() {
+    var env = state.envelope;
+    var reps = env ? env.replicates : 1000;
+    return card(
+      "Observed vs expected — Monte Carlo envelope",
+      "Null replications of " + (env ? env.draws : state.parsed.draws.length) + " draws of " +
+        state.config.picks + " from " + state.config.poolSize + ", building live. Bars are observed counts; " +
+        "the band is the 95% envelope chance produces.",
+      '<div class="row-between" style="margin-bottom:14px;gap:16px">' +
+        '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">' +
+          '<button class="primary-button" type="button" id="envPlay">Replay</button>' +
+          '<span class="hint" id="envCount">0 replications</span>' +
+        "</div>" +
+        '<div class="slider-row" style="min-width:240px;margin:0">' +
+          '<div class="row-between"><label for="envReps">Replications</label><output id="envRepsOut">' + reps.toLocaleString() + "</output></div>" +
+          '<input type="range" id="envReps" min="200" max="5000" step="100" value="' + reps + '">' +
+        "</div>" +
+      "</div>" +
+      '<div id="envChartWrap"></div>' +
+      '<div id="envLive" style="margin-top:14px"></div>'
     );
   }
 
@@ -1011,6 +1051,128 @@
       '<text x="' + (pad - 6) + '" y="' + (H - pad) + '" text-anchor="end" font-size="10" fill="#8b99ad">0</text>' +
       "</svg>"
     );
+  }
+
+  /* ------- Animated observed-vs-expected envelope: band + bars build live ------- */
+
+  function startEnvelopeAnimation(panel) {
+    if (envelopeAnim.raf) cancelAnimationFrame(envelopeAnim.raf);
+    var wrap = panel.querySelector("#envChartWrap");
+    var live = panel.querySelector("#envLive");
+    var countEl = panel.querySelector("#envCount");
+    var repsEl = panel.querySelector("#envReps");
+    var repsOut = panel.querySelector("#envRepsOut");
+    if (!wrap) return;
+
+    var draws = state.parsed.draws;
+    var cfg = state.config;
+    var N = cfg.poolSize;
+    var k = cfg.picks;
+    var D = draws.length;
+    var q = k / N;
+    var expectedCount = (D * k) / N;
+    var s = E.summarize(draws, cfg);
+    var observed = s.counts;
+    var level = 0.95;
+    var loQ = (1 - level) / 2;
+    var hiQ = 1 - loQ;
+
+    var R, samplers, rand, done;
+
+    function reset(newReps) {
+      R = newReps;
+      rand = E.stats.mulberry32(state.mcSeed >>> 0);
+      done = 0;
+      samplers = [];
+      for (var j = 0; j < N; j++) samplers.push(E.reservoirSampler(rand, 384));
+    }
+
+    function fmtInt(x) { return x.toLocaleString(); }
+
+    function currentRows() {
+      var rows = [];
+      for (var i = 0; i < N; i++) {
+        rows.push({
+          number: i + cfg.poolMin,
+          observed: observed[i],
+          expected: expectedCount,
+          envelopeLo: samplers[i].quantile(loQ),
+          envelopeHi: samplers[i].quantile(hiQ)
+        });
+      }
+      return rows;
+    }
+
+    function renderFrame(final) {
+      var rows = currentRows();
+      wrap.innerHTML = envelopeChart({ rows: rows, expectedCount: expectedCount });
+      countEl.textContent = fmtInt(done) + " replications";
+
+      var outside = rows.filter(function (r) { return r.observed < r.envelopeLo || r.observed > r.envelopeHi; });
+      var expectedOutside = N * (1 - level);
+      var consistent = outside.length <= Math.ceil(expectedOutside * 2);
+
+      live.innerHTML =
+        '<div class="grid-3">' +
+          '<div class="metric ' + (consistent ? "is-good" : "is-warn") + '"><span>Numbers outside the 95% band</span>' +
+            "<strong>" + outside.length + "</strong>" +
+            "<small>~" + expectedOutside.toFixed(1) + " expected by chance across " + N + " numbers</small></div>" +
+          '<div class="metric"><span>Outside numbers</span>' +
+            '<strong style="font-size:1rem">' + (outside.length ? outside.map(function (r) { return r.number; }).join(" · ") : "none") + "</strong>" +
+            "<small>observed count beyond the envelope</small></div>" +
+          '<div class="metric"><span>Expected count / number</span>' +
+            "<strong>" + expectedCount.toFixed(1) + "</strong>" +
+            "<small>" + D + " draws × " + k + " picks ÷ " + N + " numbers</small></div>" +
+        "</div>" +
+        (final
+          ? consistent
+            ? '<div class="callout is-good" style="margin-top:12px"><strong>Settled — consistent with chance.</strong> ' +
+              outside.length + " of " + N + " numbers sit outside the 95% envelope after " + fmtInt(done) +
+              " replications, about what a fair mechanism throws off by luck.</div>"
+            : '<div class="callout is-warn" style="margin-top:12px"><strong>Settled — more structure than chance explains.</strong> ' +
+              outside.length + " of " + N + " numbers sit outside the 95% envelope after " + fmtInt(done) +
+              " replications, well beyond the ~" + expectedOutside.toFixed(1) + " expected from a fair mechanism.</div>"
+          : "");
+    }
+
+    function step() {
+      var chunk = Math.max(2, Math.floor(R / 160));
+      for (var c = 0; c < chunk && done < R; c++) {
+        // One null replication: D draws of k from a uniform pool of N, then
+        // record the count each number received (0 if it was never picked).
+        var repCounts = new Array(N).fill(0);
+        var w = new Array(N).fill(1);
+        for (var d = 0; d < D; d++) {
+          var picked = E.drawWithoutReplacement(rand, w, k);
+          for (var p = 0; p < picked.length; p++) repCounts[picked[p]]++;
+        }
+        for (var nn = 0; nn < N; nn++) samplers[nn].add(repCounts[nn]);
+        done++;
+      }
+      renderFrame(done >= R);
+      if (done < R) {
+        envelopeAnim.raf = requestAnimationFrame(step);
+      } else {
+        envelopeAnim.raf = null;
+      }
+    }
+
+    panel.querySelector("#envPlay").addEventListener("click", function () {
+      if (envelopeAnim.raf) cancelAnimationFrame(envelopeAnim.raf);
+      reset(R);
+      envelopeAnim.raf = requestAnimationFrame(step);
+    });
+    repsEl.addEventListener("input", function () {
+      repsOut.textContent = fmtInt(Number(repsEl.value));
+    });
+    repsEl.addEventListener("change", function () {
+      if (envelopeAnim.raf) cancelAnimationFrame(envelopeAnim.raf);
+      reset(Number(repsEl.value));
+      envelopeAnim.raf = requestAnimationFrame(step);
+    });
+
+    reset(R = state.envelope ? state.envelope.replicates : 1000);
+    envelopeAnim.raf = requestAnimationFrame(step);
   }
 
   /* ---------------- Monte Carlo: prediction pattern + next set ---------------- */

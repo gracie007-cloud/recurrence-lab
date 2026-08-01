@@ -1969,6 +1969,40 @@
   }
 
   /* ====================================================================
+   * 9b. Streaming reservoir sampler (for live animated envelopes)
+   * --------------------------------------------------------------------
+   * A tiny fixed-capacity reservoir that keeps a uniform-ish random sample
+   * of a stream so quantiles can be estimated on the fly. Deterministic for
+   * a given seeded PRNG. Used by the animated Monte Carlo envelope so the
+   * 95% band can build up live as the null replications accumulate.
+   * ================================================================== */
+
+  function reservoirSampler(rand, capacity) {
+    var cap = Math.max(64, capacity || 512);
+    var buf = [];
+    var seen = 0;
+    return {
+      add: function (x) {
+        seen++;
+        if (buf.length < cap) {
+          buf.push(x);
+        } else {
+          var j = Math.floor(rand() * seen);
+          if (j < cap) buf[j] = x;
+        }
+      },
+      count: function () { return seen; },
+      quantile: function (q) {
+        if (!buf.length) return 0;
+        var s = buf.slice().sort(function (a, b) { return a - b; });
+        var idx = clamp(Math.floor(q * (s.length - 1)), 0, s.length - 1);
+        return s[idx];
+      },
+      mean: function () { return buf.length ? sum(buf) / buf.length : 0; }
+    };
+  }
+
+  /* ====================================================================
    * 10. Public surface
    * ================================================================== */
 
@@ -1993,6 +2027,7 @@
     monteCarloEnvelope: monteCarloEnvelope,
     predictionMonteCarlo: predictionMonteCarlo,
     drawWithoutReplacement: drawWithoutReplacement,
+    reservoirSampler: reservoirSampler,
     generateSample: generateSample,
     normalizeToPicks: normalizeToPicks,
     multiLabelLogLoss: multiLabelLogLoss,

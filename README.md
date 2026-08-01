@@ -38,12 +38,13 @@ never predict a next draw.
 
 Two simulation views make the statistics visible rather than just numeric:
 
-- **Observed vs expected — Monte Carlo envelope.** The null experiment (the
-  observed number of draws of `k` from `N`) is replicated thousands of times to
-  build a 95% envelope around the expected count for each number. The observed
-  counts are laid over that band: a number far outside it deviates from what
-  chance produces, with the explicit caveat that a fair mechanism still throws
-  a few numbers outside by luck. A re-run button draws a fresh simulation.
+- **Observed vs expected — Monte Carlo envelope (animated).** The null
+  experiment (the observed number of draws of `k` from `N`) is replicated live,
+  and the 95% envelope band and observed-count bars **build up as the
+  replications accumulate**, with a play/replay control and a replication-count
+  slider. A live readout shows how many numbers sit outside the band versus the
+  ~5% a fair mechanism throws off by luck, and settles when the run completes.
+  Streaming quantiles come from a deterministic reservoir sampler.
 - **Next-draw prediction — Monte Carlo (animated).** The currently selected
   tool's fitted probability vector is sampled live, and the predicted-rate bars
   **build up as the draws accumulate**, with a play/replay control and a
