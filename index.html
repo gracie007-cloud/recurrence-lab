@@ -58,6 +58,21 @@
             <p class="hint">One-click load of real, source-cited draw histories. The matching draw-format preset is applied automatically.</p>
             <button class="ghost-button" type="button" id="btnRefreshLibrary" hidden>Refresh</button>
           </div>
+          <div class="library-controls">
+            <input type="search" id="librarySearch" class="library-search" placeholder="Search datasets by name, country, or game…" aria-label="Search datasets">
+            <div class="library-filters" role="group" aria-label="Filter datasets">
+              <span class="filter-label">Region:</span>
+              <button class="filter-chip is-active" type="button" data-filter="region" data-value="all">All</button>
+              <button class="filter-chip" type="button" data-filter="region" data-value="North America">N. America</button>
+              <button class="filter-chip" type="button" data-filter="region" data-value="Europe">Europe</button>
+              <button class="filter-chip" type="button" data-filter="region" data-value="Asia-Pacific">Asia-Pacific</button>
+              <span class="filter-label" style="margin-left:10px">Type:</span>
+              <button class="filter-chip is-active" type="button" data-filter="gameType" data-value="all">All</button>
+              <button class="filter-chip" type="button" data-filter="gameType" data-value="pick-6">Pick-6 (lotto)</button>
+              <button class="filter-chip" type="button" data-filter="gameType" data-value="pick-5-bonus">Pick-5 + bonus</button>
+            </div>
+            <div class="library-count" id="libraryCount" aria-live="polite"></div>
+          </div>
           <div id="libraryGrid" class="library-grid" role="list">
             <div class="library-empty" id="libraryEmpty">Loading library&hellip;</div>
           </div>

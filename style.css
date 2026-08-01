@@ -529,3 +529,16 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-fam
 .save-dialog input { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; font-size: 0.9rem; margin-bottom: 14px; box-sizing: border-box; }
 .save-dialog .save-actions { display: flex; gap: 10px; justify-content: flex-end; }
 .save-dialog .save-summary { font-size: 0.78rem; color: var(--subtle); margin-bottom: 12px; line-height: 1.4; }
+
+/* ============ Library search + filters ============ */
+.library-controls { margin: 12px 0 14px; display: flex; flex-direction: column; gap: 10px; }
+.library-search { width: 100%; max-width: 480px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 6px; font-size: 0.9rem; background: var(--surface); color: var(--text); box-sizing: border-box; }
+.library-search:focus { outline: 2px solid var(--blue-soft); border-color: var(--blue); }
+.library-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.filter-label { font-size: 0.75rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.filter-chip { padding: 4px 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--muted); font-size: 0.78rem; cursor: pointer; transition: all 0.12s; }
+.filter-chip:hover { border-color: var(--blue); color: var(--blue); }
+.filter-chip.is-active { background: var(--blue); border-color: var(--blue); color: #fff; }
+.library-count { font-size: 0.78rem; color: var(--subtle); }
+.library-grid.is-filtered .library-card { animation: none; }
+@media (max-width: 640px) { .library-filters { gap: 4px; } .filter-chip { padding: 3px 8px; font-size: 0.72rem; } }

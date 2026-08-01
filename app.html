@@ -540,6 +540,20 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-fam
 .save-dialog .save-actions { display: flex; gap: 10px; justify-content: flex-end; }
 .save-dialog .save-summary { font-size: 0.78rem; color: var(--subtle); margin-bottom: 12px; line-height: 1.4; }
 
+
+/* ============ Library search + filters ============ */
+.library-controls { margin: 12px 0 14px; display: flex; flex-direction: column; gap: 10px; }
+.library-search { width: 100%; max-width: 480px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 6px; font-size: 0.9rem; background: var(--surface); color: var(--text); box-sizing: border-box; }
+.library-search:focus { outline: 2px solid var(--blue-soft); border-color: var(--blue); }
+.library-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.filter-label { font-size: 0.75rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.filter-chip { padding: 4px 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--muted); font-size: 0.78rem; cursor: pointer; transition: all 0.12s; }
+.filter-chip:hover { border-color: var(--blue); color: var(--blue); }
+.filter-chip.is-active { background: var(--blue); border-color: var(--blue); color: #fff; }
+.library-count { font-size: 0.78rem; color: var(--subtle); }
+.library-grid.is-filtered .library-card { animation: none; }
+@media (max-width: 640px) { .library-filters { gap: 4px; } .filter-chip { padding: 3px 8px; font-size: 0.72rem; } }
+
 </style>
   </head>
   <body>
@@ -593,6 +607,23 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-fam
             <p class="hint">One-click load of real, source-cited draw histories. The matching draw-format preset is applied automatically.</p>
             <button class="ghost-button" type="button" id="btnRefreshLibrary" hidden>Refresh</button>
           </div>
+          
+          <div class="library-controls">
+            <input type="search" id="librarySearch" class="library-search" placeholder="Search datasets by name, country, or game&hellip;" aria-label="Search datasets">
+            <div class="library-filters" role="group" aria-label="Filter datasets">
+              <span class="filter-label">Region:</span>
+              <button class="filter-chip is-active" type="button" data-filter="region" data-value="all">All</button>
+              <button class="filter-chip" type="button" data-filter="region" data-value="North America">N. America</button>
+              <button class="filter-chip" type="button" data-filter="region" data-value="Europe">Europe</button>
+              <button class="filter-chip" type="button" data-filter="region" data-value="Asia-Pacific">Asia-Pacific</button>
+              <span class="filter-label" style="margin-left:10px">Type:</span>
+              <button class="filter-chip is-active" type="button" data-filter="gameType" data-value="all">All</button>
+              <button class="filter-chip" type="button" data-filter="gameType" data-value="pick-6">Pick-6 (lotto)</button>
+              <button class="filter-chip" type="button" data-filter="gameType" data-value="pick-5-bonus">Pick-5 + bonus</button>
+            </div>
+            <div class="library-count" id="libraryCount" aria-live="polite"></div>
+          </div>
+
           <div id="libraryGrid" class="library-grid" role="list">
             <div class="library-empty" id="libraryEmpty">Loading library&hellip;</div>
           </div>
@@ -2889,6 +2920,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-fam
 
 
 
+
     <script>
 /*
  * Recurrence Lab — UI controller
@@ -3010,7 +3042,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-fam
 
   /* ---------------- dataset library ---------------- */
 
-  var library = { manifest: null, status: "idle" };
+  var library = { manifest: null, status: "idle", filters: { search: "", region: "all", gameType: "all" } };
 
   function initLibrary() {
     var grid = $("libraryGrid");
@@ -3020,6 +3052,28 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-fam
     if (refresh) {
       refresh.addEventListener("click", function () { loadLibraryManifest(true); });
     }
+    // Wire search input
+    var search = $("librarySearch");
+    if (search) {
+      search.addEventListener("input", function () {
+        library.filters.search = search.value.toLowerCase().trim();
+        applyLibraryFilters();
+      });
+    }
+    // Wire filter chips
+    Array.prototype.forEach.call(document.querySelectorAll(".filter-chip"), function (chip) {
+      chip.addEventListener("click", function () {
+        var ftype = chip.getAttribute("data-filter");
+        var fval = chip.getAttribute("data-value");
+        // Deactivate siblings in the same filter group
+        Array.prototype.forEach.call(document.querySelectorAll('.filter-chip[data-filter="' + ftype + '"]'), function (c) {
+          c.classList.remove("is-active");
+        });
+        chip.classList.add("is-active");
+        library.filters[ftype] = fval;
+        applyLibraryFilters();
+      });
+    });
     loadLibraryManifest(false);
   }
 
@@ -3056,9 +3110,32 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-fam
     if (!grid) return;
     if (!datasets.length) {
       grid.innerHTML = '<div class="library-empty">No datasets in the library yet.</div>';
+      updateLibraryCount(0, 0);
       return;
     }
-    grid.innerHTML = datasets.map(function (d) {
+    // Store the full list and render the filtered subset.
+    library.allDatasets = datasets;
+    applyLibraryFilters();
+  }
+
+  // Apply the current search + region + gameType filters and re-render the grid.
+  function applyLibraryFilters() {
+    var grid = $("libraryGrid");
+    if (!grid || !library.allDatasets) return;
+    var f = library.filters;
+    var filtered = library.allDatasets.filter(function (d) {
+      // Search: match name, country, game, id
+      if (f.search) {
+        var hay = ((d.name || "") + " " + (d.country || "") + " " + (d.game || "") + " " + (d.id || "")).toLowerCase();
+        if (hay.indexOf(f.search) === -1) return false;
+      }
+      // Region filter
+      if (f.region !== "all" && (d.region || "Other") !== f.region) return false;
+      // Game type filter
+      if (f.gameType !== "all" && (d.gameType || "other") !== f.gameType) return false;
+      return true;
+    });
+    grid.innerHTML = filtered.map(function (d) {
       return (
         '<div class="library-card" role="listitem" data-dsid="' + esc(d.id) + '">' +
           '<div class="lc-name">' + esc(d.name) + "</div>" +
@@ -3067,6 +3144,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-fam
             "<span>" + esc(d.draws + " draws") + "</span>" +
             "<span>" + esc(d.dateRange) + "</span>" +
             "<span>" + esc(d.schedule) + "</span>" +
+            "<span>" + esc(d.region || "") + "</span>" +
           "</div>" +
           '<div class="lc-note">' + esc(d.note || "") + "</div>" +
           '<div class="lc-source">Source: ' +
@@ -3080,13 +3158,28 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-fam
         "</div>"
       );
     }).join("");
-    // Wire load buttons
+    // Wire load buttons on the filtered set
     Array.prototype.forEach.call(grid.querySelectorAll("[data-load]"), function (btn) {
       btn.addEventListener("click", function () {
         var id = btn.getAttribute("data-load");
         loadDatasetById(id, btn);
       });
     });
+    // Empty state when filters match nothing
+    if (!filtered.length) {
+      grid.innerHTML = '<div class="library-empty">No datasets match your filters.</div>';
+    }
+    updateLibraryCount(filtered.length, library.allDatasets.length);
+  }
+
+  function updateLibraryCount(shown, total) {
+    var el = $("libraryCount");
+    if (!el) return;
+    if (shown === total) {
+      el.textContent = total + " dataset" + (total === 1 ? "" : "s");
+    } else {
+      el.textContent = shown + " of " + total + " datasets";
+    }
   }
 
   function loadDatasetById(id, btn) {
@@ -5020,6 +5113,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-fam
 })();
 
 </script>
+
 
 
 

@@ -118,7 +118,7 @@
 
   /* ---------------- dataset library ---------------- */
 
-  var library = { manifest: null, status: "idle" };
+  var library = { manifest: null, status: "idle", filters: { search: "", region: "all", gameType: "all" } };
 
   function initLibrary() {
     var grid = $("libraryGrid");
@@ -128,6 +128,28 @@
     if (refresh) {
       refresh.addEventListener("click", function () { loadLibraryManifest(true); });
     }
+    // Wire search input
+    var search = $("librarySearch");
+    if (search) {
+      search.addEventListener("input", function () {
+        library.filters.search = search.value.toLowerCase().trim();
+        applyLibraryFilters();
+      });
+    }
+    // Wire filter chips
+    Array.prototype.forEach.call(document.querySelectorAll(".filter-chip"), function (chip) {
+      chip.addEventListener("click", function () {
+        var ftype = chip.getAttribute("data-filter");
+        var fval = chip.getAttribute("data-value");
+        // Deactivate siblings in the same filter group
+        Array.prototype.forEach.call(document.querySelectorAll('.filter-chip[data-filter="' + ftype + '"]'), function (c) {
+          c.classList.remove("is-active");
+        });
+        chip.classList.add("is-active");
+        library.filters[ftype] = fval;
+        applyLibraryFilters();
+      });
+    });
     loadLibraryManifest(false);
   }
 
@@ -164,9 +186,32 @@
     if (!grid) return;
     if (!datasets.length) {
       grid.innerHTML = '<div class="library-empty">No datasets in the library yet.</div>';
+      updateLibraryCount(0, 0);
       return;
     }
-    grid.innerHTML = datasets.map(function (d) {
+    // Store the full list and render the filtered subset.
+    library.allDatasets = datasets;
+    applyLibraryFilters();
+  }
+
+  // Apply the current search + region + gameType filters and re-render the grid.
+  function applyLibraryFilters() {
+    var grid = $("libraryGrid");
+    if (!grid || !library.allDatasets) return;
+    var f = library.filters;
+    var filtered = library.allDatasets.filter(function (d) {
+      // Search: match name, country, game, id
+      if (f.search) {
+        var hay = ((d.name || "") + " " + (d.country || "") + " " + (d.game || "") + " " + (d.id || "")).toLowerCase();
+        if (hay.indexOf(f.search) === -1) return false;
+      }
+      // Region filter
+      if (f.region !== "all" && (d.region || "Other") !== f.region) return false;
+      // Game type filter
+      if (f.gameType !== "all" && (d.gameType || "other") !== f.gameType) return false;
+      return true;
+    });
+    grid.innerHTML = filtered.map(function (d) {
       return (
         '<div class="library-card" role="listitem" data-dsid="' + esc(d.id) + '">' +
           '<div class="lc-name">' + esc(d.name) + "</div>" +
@@ -175,6 +220,7 @@
             "<span>" + esc(d.draws + " draws") + "</span>" +
             "<span>" + esc(d.dateRange) + "</span>" +
             "<span>" + esc(d.schedule) + "</span>" +
+            "<span>" + esc(d.region || "") + "</span>" +
           "</div>" +
           '<div class="lc-note">' + esc(d.note || "") + "</div>" +
           '<div class="lc-source">Source: ' +
@@ -188,13 +234,28 @@
         "</div>"
       );
     }).join("");
-    // Wire load buttons
+    // Wire load buttons on the filtered set
     Array.prototype.forEach.call(grid.querySelectorAll("[data-load]"), function (btn) {
       btn.addEventListener("click", function () {
         var id = btn.getAttribute("data-load");
         loadDatasetById(id, btn);
       });
     });
+    // Empty state when filters match nothing
+    if (!filtered.length) {
+      grid.innerHTML = '<div class="library-empty">No datasets match your filters.</div>';
+    }
+    updateLibraryCount(filtered.length, library.allDatasets.length);
+  }
+
+  function updateLibraryCount(shown, total) {
+    var el = $("libraryCount");
+    if (!el) return;
+    if (shown === total) {
+      el.textContent = total + " dataset" + (total === 1 ? "" : "s");
+    } else {
+      el.textContent = shown + " of " + total + " datasets";
+    }
   }
 
   function loadDatasetById(id, btn) {

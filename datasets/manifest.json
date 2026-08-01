@@ -21,7 +21,9 @@
       "sourceUrl": "https://www.lotto-8.com/canada/listltoCA649.asp",
       "accessed": "2026-07-30",
       "file": "datasets/canada_649.txt",
-      "note": "Standard 6-from-49 with bonus. Fully real, cross-verified."
+      "note": "Standard 6-from-49 with bonus. Fully real, cross-verified.",
+      "region": "North America",
+      "gameType": "pick-6"
     },
     {
       "id": "us-powerball",
@@ -41,7 +43,9 @@
       "sourceUrl": "https://powerball-checker.com/results/history",
       "accessed": "2026-07-31",
       "file": "datasets/us_powerball.txt",
-      "note": "5 whites (1-69) + 1 red Powerball (1-26). Engine analyses the main 5/69 pool; the Powerball loads as a bonus number."
+      "note": "5 whites (1-69) + 1 red Powerball (1-26). Engine analyses the main 5/69 pool; the Powerball loads as a bonus number.",
+      "region": "North America",
+      "gameType": "pick-5-bonus"
     },
     {
       "id": "us-megamillions",
@@ -61,7 +65,9 @@
       "sourceUrl": "https://www.lottery.net/mega-millions/numbers/2026",
       "accessed": "2026-07-11",
       "file": "datasets/us_megamillions.txt",
-      "note": "5 whites (1-70) + 1 gold Mega Ball (1-25). Engine analyses the main 5/70 pool; the Mega Ball loads as a bonus number."
+      "note": "5 whites (1-70) + 1 gold Mega Ball (1-25). Engine analyses the main 5/70 pool; the Mega Ball loads as a bonus number.",
+      "region": "North America",
+      "gameType": "pick-5-bonus"
     },
     {
       "id": "uk-lotto",
@@ -81,7 +87,9 @@
       "sourceUrl": "https://www.lottery.co.uk/lotto/results/archive-2026",
       "accessed": "2026-08-01",
       "file": "datasets/uk_lotto.txt",
-      "note": "6 main (1-59) + 1 bonus (1-59). From 2026-06-10 UK Lotto uses a two-round format; Round 1 shown as primary draw."
+      "note": "6 main (1-59) + 1 bonus (1-59). From 2026-06-10 UK Lotto uses a two-round format; Round 1 shown as primary draw.",
+      "region": "Europe",
+      "gameType": "pick-6"
     },
     {
       "id": "pcso-649",
@@ -101,7 +109,9 @@
       "sourceUrl": "https://www.lottopcso.com/6-49-lotto-result-history-and-summary/",
       "accessed": "2026-07-23",
       "file": "datasets/pcso_649.txt",
-      "note": "6-from-49, no bonus. PCSO Super Lotto."
+      "note": "6-from-49, no bonus. PCSO Super Lotto.",
+      "region": "Asia-Pacific",
+      "gameType": "pick-6"
     },
     {
       "id": "euromillions",
@@ -121,7 +131,9 @@
       "sourceUrl": "https://www.euro-millions.com/results-history-2026",
       "accessed": "2026-07-31",
       "file": "datasets/euromillions.txt",
-      "note": "5 main (1-50) + 2 Lucky Stars (1-12). Engine analyses the main 5/50 pool; the Lucky Stars load as bonus numbers."
+      "note": "5 main (1-50) + 2 Lucky Stars (1-12). Engine analyses the main 5/50 pool; the Lucky Stars load as bonus numbers.",
+      "region": "Europe",
+      "gameType": "pick-5-bonus"
     },
     {
       "id": "australia-saturday-lotto",
@@ -141,7 +153,9 @@
       "sourceUrl": "https://www.lottoresult.io/au/saturday-lotto",
       "accessed": "2026-07-08",
       "file": "datasets/australia_saturday_lotto.txt",
-      "note": "6 main (1-45) + 2 supplementary (1-45). Uses the 6/45 preset; supplementary numbers load as bonus."
+      "note": "6 main (1-45) + 2 supplementary (1-45). Uses the 6/45 preset; supplementary numbers load as bonus.",
+      "region": "Asia-Pacific",
+      "gameType": "pick-6"
     },
     {
       "id": "spain-elgordo",
@@ -161,7 +175,9 @@
       "sourceUrl": "https://www.elgordo.com/es/resultados/gordo-primitiva.html",
       "accessed": "2026-07-29",
       "file": "datasets/spain_elgordo.txt",
-      "note": "5 main (1-54) + 1 clave (0-9). Engine analyses the main 5/54 pool; the clave (0-9) loads as a bonus number."
+      "note": "5 main (1-54) + 1 clave (0-9). Engine analyses the main 5/54 pool; the clave (0-9) loads as a bonus number.",
+      "region": "Europe",
+      "gameType": "pick-5-bonus"
     },
     {
       "id": "eurojackpot",
@@ -181,7 +197,9 @@
       "sourceUrl": "https://jackpotgenius.ai/eurojackpot/history",
       "accessed": "2026-07-25",
       "file": "datasets/eurojackpot.txt",
-      "note": "5 main (1-50) + 2 Euro numbers (1-12). Engine analyses the main 5/50 pool; the Euro numbers load as bonus."
+      "note": "5 main (1-50) + 2 Euro numbers (1-12). Engine analyses the main 5/50 pool; the Euro numbers load as bonus.",
+      "region": "Europe",
+      "gameType": "pick-5-bonus"
     },
     {
       "id": "italy-superenalotto",
@@ -201,7 +219,9 @@
       "sourceUrl": "https://www.superenalotto.net/en/results",
       "accessed": "2026-08-01",
       "file": "datasets/italy_superenalotto.txt",
-      "note": "6 main (1-90) + 1 Jolly (1-90). SuperStar number excluded. Draws span ~6 weeks due to 4-draw/week cadence."
+      "note": "6 main (1-90) + 1 Jolly (1-90). SuperStar number excluded. Draws span ~6 weeks due to 4-draw/week cadence.",
+      "region": "Europe",
+      "gameType": "pick-6"
     }
   ]
 }
