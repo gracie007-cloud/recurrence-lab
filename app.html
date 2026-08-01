@@ -2671,6 +2671,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-fam
     structureTests: structureTests,
     monteCarloEnvelope: monteCarloEnvelope,
     predictionMonteCarlo: predictionMonteCarlo,
+    drawWithoutReplacement: drawWithoutReplacement,
     generateSample: generateSample,
     normalizeToPicks: normalizeToPicks,
     multiLabelLogLoss: multiLabelLogLoss,
@@ -2989,6 +2990,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-fam
           state.tool = recommend;
           // Monte Carlo next-draw simulation from the recommended model.
           var probs = E.scorerFor(recommend, cfg, state.stochasticOpts)(draws);
+          state.predProbs = probs;
           state.predMC = E.predictionMonteCarlo(probs, cfg, { seed: state.mcSeed });
           state.predTool = recommend;
           render();
@@ -3042,11 +3044,16 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-fam
   function renderPredictionMC() {
     var host = $("predictionHost");
     if (!host) return;
-    if (!state.predMC) { host.hidden = true; host.innerHTML = ""; return; }
+    if (!state.predMC || !state.predProbs) { host.hidden = true; host.innerHTML = ""; return; }
     host.hidden = false;
-    host.innerHTML = predictionMonteCarloCard();
-    var btn = $("btnResim");
-    if (btn) btn.addEventListener("click", resimulate);
+    // Animated build by default; static summary if reduced-motion is preferred.
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      host.innerHTML = predictionMonteCarloCard();
+      var btn = $("btnResim");
+      if (btn) btn.addEventListener("click", resimulate);
+    } else {
+      startPredictionAnimation(host);
+    }
   }
 
   function resimulate() {
@@ -3056,6 +3063,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-fam
     var cfg = state.config;
     state.envelope = E.monteCarloEnvelope(draws, cfg, { seed: state.mcSeed });
     var probs = E.scorerFor(state.predTool || state.recommended || "stochastic", cfg, state.stochasticOpts)(draws);
+    state.predProbs = probs;
     state.predMC = E.predictionMonteCarlo(probs, cfg, { seed: state.mcSeed });
     renderStochastic();
     renderPredictionMC();
@@ -3258,6 +3266,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-fam
     if (state.parsed && state.parsed.draws.length && state.results[tool]) {
       var cfg = state.config;
       var probs = E.scorerFor(tool, cfg, state.stochasticOpts)(state.parsed.draws);
+      state.predProbs = probs;
       state.predMC = E.predictionMonteCarlo(probs, cfg, { seed: state.mcSeed });
       state.predTool = tool;
     }
@@ -3701,22 +3710,47 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-fam
 
   /* ---------------- Monte Carlo: prediction pattern + next set ---------------- */
 
+  var predictionAnim = { raf: null };
+
+  function predictionRatesChartSmall(rows, nullRate) {
+    var W = 720, H = 180, pad = 30;
+    var maxV = Math.max.apply(null, rows.map(function (r) { return r.predictedRate; }).concat([nullRate])) || 1;
+    var n = rows.length;
+    var bw = (W - pad * 2) / n;
+    function y(v) { return H - pad - (v / maxV) * (H - pad * 2); }
+    var bars = "";
+    for (var i = 0; i < n; i++) {
+      var r = rows[i];
+      var x = pad + i * bw;
+      var lift = nullRate > 0 ? r.predictedRate / nullRate : 1;
+      var col = lift > 1.3 ? "#12b981" : lift < 0.7 ? "#e65f6a" : "#0b65d8";
+      bars += '<rect x="' + (x + bw * 0.15).toFixed(1) + '" y="' + y(r.predictedRate).toFixed(1) +
+        '" width="' + Math.max(1, bw * 0.7).toFixed(1) +
+        '" height="' + (H - pad - y(r.predictedRate)).toFixed(1) +
+        '" fill="' + col + '" rx="1"><title>' + r.number + ": " + (r.predictedRate * 100).toFixed(1) + "%</title></rect>";
+    }
+    var qy = y(nullRate);
+    return (
+      '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Predicted rate per number vs null">' +
+      '<line x1="' + pad + '" y1="' + (H - pad) + '" x2="' + (W - pad) + '" y2="' + (H - pad) + '" stroke="#dce4ef"/>' +
+      bars +
+      '<line x1="' + pad + '" y1="' + qy.toFixed(1) + '" x2="' + (W - pad) + '" y2="' + qy.toFixed(1) +
+        '" stroke="#0a7a55" stroke-dasharray="4 3" stroke-width="1.4"/>' +
+      '<text x="' + (W - pad) + '" y="' + (qy - 5).toFixed(1) + '" text-anchor="end" font-size="10" fill="#0a7a55">null ' +
+        (nullRate * 100).toFixed(1) + "%</text>" +
+      '<text x="' + (pad - 6) + '" y="' + (pad + 4) + '" text-anchor="end" font-size="10" fill="#8b99ad">' + (maxV * 100).toFixed(0) + "%</text>" +
+      '<text x="' + (pad - 6) + '" y="' + (H - pad) + '" text-anchor="end" font-size="10" fill="#8b99ad">0</text>' +
+      "</svg>"
+    );
+  }
+
+  // Static (final-state) card — used for reduced-motion and as the summary.
   function predictionMonteCarloCard() {
     var mc = state.predMC;
     if (!mc) return "";
     var toolName = { analytic: "Analytic derivation", stochastic: "Stochastic recurrence", hybrid: "Hybrid ensemble" }[state.predTool] || "Model";
     var k = state.config.picks;
-    var N = state.config.poolSize;
     var top = mc.topNumbers;
-
-    var ratesChart = predictionRatesChart(mc);
-
-    var nextSet =
-      '<div class="prediction-row">' +
-        mc.modalSet.map(function (n) {
-          return '<div class="pred-ball">' + n + "</div>";
-        }).join("") +
-      "</div>";
 
     var framing =
       mc.concentration > 2
@@ -3732,21 +3766,10 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-fam
     return card(
       "Next-draw prediction — Monte Carlo",
       mc.replicates.toLocaleString() + " simulated next draws from the " + esc(toolName) +
-        " probability vector. A distribution, not a promise. " +
-        '<button class="chip-button" type="button" id="btnResim" style="float:right">Re-run simulation</button>',
-      '<div class="grid-3" style="margin-bottom:16px">' +
-        metric("Top predicted number", String(top[0].number),
-          (top[0].predictedRate * 100).toFixed(1) + "% vs null " + (top[0].nullRate * 100).toFixed(1) + "% (" +
-          top[0].lift.toFixed(2) + "×)", Math.abs(top[0].lift - 1) < 0.2 ? "" : "is-warn") +
-        metric("Exact-set probability", fmtSmall(mc.modalSetProb),
-          "modal set vs " + fmtSmall(mc.nullSetProb) + " for any set", "") +
-        metric("Possible sets", Number(mc.totalSets).toLocaleString(undefined, { maximumFractionDigits: 0 }),
-          "C(" + N + ", " + k + ") combinations", "") +
-      "</div>" +
-      "<h4 style=\"font-size:0.85rem;margin-bottom:10px\">Predicted rate per number vs null</h4>" +
-      ratesChart +
+        " probability vector. A distribution, not a promise.",
+      predictionRatesChartSmall(mc.rows, mc.rows[0].nullRate) +
       "<h4 style=\"font-size:0.85rem;margin:18px 0 10px\">Most likely next set (top " + k + " by model probability)</h4>" +
-      nextSet +
+      '<div class="prediction-row">' + mc.modalSet.map(function (n) { return '<div class="pred-ball">' + n + "</div>"; }).join("") + "</div>" +
       '<p class="hint" style="margin-top:12px">Highest per-number rate ' + (top[0].predictedRate * 100).toFixed(1) +
         "% versus null " + (top[0].nullRate * 100).toFixed(1) + "%. " +
         (Math.abs(top[0].lift - 1) < 0.2 ? "Within noise — treat as a ranking, not an edge." : "") + "</p>" +
@@ -3754,39 +3777,138 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-fam
     );
   }
 
-  function predictionRatesChart(mc) {
-    var rows = mc.rows;
-    var W = 720, H = 180, pad = 30;
-    var maxV = Math.max.apply(null, rows.map(function (r) { return r.predictedRate; }).concat([mc.rows[0].nullRate])) || 1;
-    var n = rows.length;
-    var bw = (W - pad * 2) / n;
-    function y(v) { return H - pad - (v / maxV) * (H - pad * 2); }
-    var bars = "";
-    for (var i = 0; i < n; i++) {
-      var r = rows[i];
-      var x = pad + i * bw;
-      var lift = r.nullRate > 0 ? r.predictedRate / r.nullRate : 1;
-      var col = lift > 1.3 ? "#12b981" : lift < 0.7 ? "#e65f6a" : "#0b65d8";
-      bars += '<rect x="' + (x + bw * 0.15).toFixed(1) + '" y="' + y(r.predictedRate).toFixed(1) +
-        '" width="' + Math.max(1, bw * 0.7).toFixed(1) +
-        '" height="' + (H - pad - y(r.predictedRate)).toFixed(1) +
-        '" fill="' + col + '" rx="1"><title>' + r.number + ": " + (r.predictedRate * 100).toFixed(1) + "%</title></rect>";
-    }
-    var q = rows[0].nullRate;
-    var qy = y(q);
-    return (
-      '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Predicted rate per number vs null">' +
-      '<line x1="' + pad + '" y1="' + (H - pad) + '" x2="' + (W - pad) + '" y2="' + (H - pad) + '" stroke="#dce4ef"/>' +
-      bars +
-      '<line x1="' + pad + '" y1="' + qy.toFixed(1) + '" x2="' + (W - pad) + '" y2="' + qy.toFixed(1) +
-        '" stroke="#0a7a55" stroke-dasharray="4 3" stroke-width="1.4"/>' +
-      '<text x="' + (W - pad) + '" y="' + (qy - 5).toFixed(1) + '" text-anchor="end" font-size="10" fill="#0a7a55">null ' +
-        (q * 100).toFixed(1) + "%</text>" +
-      '<text x="' + (pad - 6) + '" y="' + (pad + 4) + '" text-anchor="end" font-size="10" fill="#8b99ad">' + (maxV * 100).toFixed(0) + "%</text>" +
-      '<text x="' + (pad - 6) + '" y="' + (H - pad) + '" text-anchor="end" font-size="10" fill="#8b99ad">0</text>' +
-      "</svg>"
+  /* ------- Animated next-draw Monte Carlo: bars build as draws accumulate ------- */
+
+  function startPredictionAnimation(host) {
+    if (predictionAnim.raf) cancelAnimationFrame(predictionAnim.raf);
+
+    var toolName = { analytic: "Analytic derivation", stochastic: "Stochastic recurrence", hybrid: "Hybrid ensemble" }[state.predTool] || "Model";
+    var cfg = state.config;
+    var k = cfg.picks;
+    var N = cfg.poolSize;
+    var q = k / N;
+
+    host.innerHTML = card(
+      "Next-draw prediction — Monte Carlo",
+      "Simulated next draws from the " + esc(toolName) + " probability vector, building live. A distribution, not a promise.",
+      '<div class="row-between" style="margin-bottom:14px;gap:16px">' +
+        '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">' +
+          '<button class="primary-button" type="button" id="mcPlay">Replay</button>' +
+          '<span class="hint" id="mcCount">0 draws simulated</span>' +
+        "</div>" +
+        '<div class="slider-row" style="min-width:240px;margin:0">' +
+          '<div class="row-between"><label for="mcReps">Replications</label><output id="mcRepsOut">2,000</output></div>' +
+          '<input type="range" id="mcReps" min="500" max="10000" step="500" value="2000">' +
+        "</div>" +
+      "</div>" +
+      '<div id="mcChartWrap"></div>' +
+      '<div id="mcLive" style="margin-top:14px"></div>'
     );
+
+    var chartWrap = host.querySelector("#mcChartWrap");
+    var live = host.querySelector("#mcLive");
+    var countEl = host.querySelector("#mcCount");
+    var repsEl = host.querySelector("#mcReps");
+    var repsOut = host.querySelector("#mcRepsOut");
+
+    var tot = sum(state.predProbs) || k;
+    var w = state.predProbs.map(function (p) { return Math.max(0, p / tot); });
+
+    var R, hits, setCounts, drawn, seed, rand;
+
+    function reset(newReps) {
+      R = newReps;
+      hits = new Array(N).fill(0);
+      setCounts = {};
+      drawn = 0;
+      seed = state.mcSeed;
+      rand = E.stats.mulberry32(seed >>> 0);
+    }
+
+    function fmtInt(x) { return x.toLocaleString(); }
+
+    function renderFrame(final) {
+      // Per-number predicted rate vs null.
+      var rows = hits.map(function (h, i) {
+        return { number: i + cfg.poolMin, predictedRate: drawn ? h / drawn : 0, nullRate: q };
+      });
+      chartWrap.innerHTML = predictionRatesChartSmall(rows, q);
+      countEl.textContent = fmtInt(drawn) + " draws simulated";
+
+      // Live convergence: modal set + its exact-set probability.
+      var bestKey = null, bestCount = 0;
+      Object.keys(setCounts).forEach(function (key) {
+        if (setCounts[key] > bestCount) { bestCount = setCounts[key]; bestKey = key; }
+      });
+      var modalSet = bestKey ? bestKey.split(",").map(function (x) { return Number(x) + cfg.poolMin; }) : [];
+      var setProb = drawn ? bestCount / drawn : 0;
+      var logComb = E.stats.logGamma(N + 1) - E.stats.logGamma(k + 1) - E.stats.logGamma(N - k + 1);
+      var nullSetProb = Math.exp(-logComb);
+      var concentration = nullSetProb > 0 ? setProb / nullSetProb : 1;
+
+      var balls = modalSet.length
+        ? '<div class="prediction-row" style="margin:10px 0">' + modalSet.map(function (n) { return '<div class="pred-ball">' + n + "</div>"; }).join("") + "</div>"
+        : '<p class="hint">Waiting for the first complete set…</p>';
+
+      live.innerHTML =
+        '<div class="grid-3">' +
+          '<div class="metric"><span>Most likely set (so far)</span>' +
+            '<strong style="font-size:1rem">' + (modalSet.length ? modalSet.join(" · ") : "—") + "</strong>" +
+            "<small>exact-set probability " + fmtSmall(setProb) + "</small></div>" +
+          '<div class="metric"><span>Concentration vs null</span>' +
+            "<strong>" + (concentration >= 1 ? concentration.toFixed(1) + "×" : "< 1×") + "</strong>" +
+            "<small>vs " + fmtSmall(nullSetProb) + " for any set</small></div>" +
+          '<div class="metric"><span>Top number rate</span>' +
+            "<strong>" + (function () { var t = rows.slice().sort(function (a, b) { return b.predictedRate - a.predictedRate; })[0]; return t ? t.number + " · " + (t.predictedRate * 100).toFixed(1) + "%" : "—"; })() + "</strong>" +
+            "<small>null " + (q * 100).toFixed(1) + "%</small></div>" +
+        "</div>" + balls +
+        (final ? '<div class="callout" style="margin-top:12px"><strong>Settled.</strong> After ' + fmtInt(drawn) +
+          " draws the estimate has converged — replications only smooth it now. " +
+          (concentration > 2
+            ? "The model concentrates real probability on this set (if the model is right)."
+            : "Probability stays near-even, which is the honest answer when the mechanism is near-fair.") +
+          "</div>" : "");
+    }
+
+    function step() {
+      // Accumulate a chunk of draws, then paint. Chunk scales to R for pace.
+      var chunk = Math.max(5, Math.floor(R / 160));
+      for (var c = 0; c < chunk && drawn < R; c++) {
+        var picked = E.drawWithoutReplacement(rand, w.slice(), k);
+        for (var p = 0; p < picked.length; p++) hits[picked[p]]++;
+        drawn++;
+        if (picked.length === k) {
+          var key = picked.slice().sort(function (a, b) { return a - b; }).join(",");
+          setCounts[key] = (setCounts[key] || 0) + 1;
+        }
+      }
+      renderFrame(drawn >= R);
+      if (drawn < R) {
+        predictionAnim.raf = requestAnimationFrame(step);
+      } else {
+        predictionAnim.raf = null;
+      }
+    }
+
+    host.querySelector("#mcPlay").addEventListener("click", function () {
+      if (predictionAnim.raf) cancelAnimationFrame(predictionAnim.raf);
+      reset(R);
+      predictionAnim.raf = requestAnimationFrame(step);
+    });
+    repsEl.addEventListener("input", function () {
+      repsOut.textContent = fmtInt(Number(repsEl.value));
+    });
+    repsEl.addEventListener("change", function () {
+      if (predictionAnim.raf) cancelAnimationFrame(predictionAnim.raf);
+      reset(Number(repsEl.value));
+      predictionAnim.raf = requestAnimationFrame(step);
+    });
+
+    reset(2000);
+    predictionAnim.raf = requestAnimationFrame(step);
   }
+
+  function sum(arr) { var t = 0; for (var i = 0; i < arr.length; i++) t += arr[i]; return t; }
 
   function fmtSmall(p) {
     if (p == null || isNaN(p)) return "—";

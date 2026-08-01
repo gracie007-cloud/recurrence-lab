@@ -1992,6 +1992,7 @@
     structureTests: structureTests,
     monteCarloEnvelope: monteCarloEnvelope,
     predictionMonteCarlo: predictionMonteCarlo,
+    drawWithoutReplacement: drawWithoutReplacement,
     generateSample: generateSample,
     normalizeToPicks: normalizeToPicks,
     multiLabelLogLoss: multiLabelLogLoss,

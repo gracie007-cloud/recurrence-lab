@@ -44,11 +44,12 @@ Two simulation views make the statistics visible rather than just numeric:
   counts are laid over that band: a number far outside it deviates from what
   chance produces, with the explicit caveat that a fair mechanism still throws
   a few numbers outside by luck. A re-run button draws a fresh simulation.
-- **Next-draw prediction — Monte Carlo.** The currently selected tool's fitted
-  probability vector is sampled thousands of times to show (a) the predicted
-  appearance rate per number against the null line, and (b) the most likely
-  next set together with its exact-set probability against the `1 / C(N, k)`
-  any set carries. This is always framed as a **distribution, never a promise** —
+- **Next-draw prediction — Monte Carlo (animated).** The currently selected
+  tool's fitted probability vector is sampled live, and the predicted-rate bars
+  **build up as the draws accumulate**, with a play/replay control and a
+  replication-count slider (500–10,000). A live readout shows the most likely
+  set and its exact-set probability converging against the `1 / C(N, k)` any
+  set carries. This is always framed as a **distribution, never a promise** —
   on a fair mechanism the model spreads probability near-evenly and says so.
 
 ## Guardrails
