@@ -1,0 +1,4117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Recurrence Lab: decide whether a number series carries a derivable law, is pure chance, or is a mixture - and judge every model by out-of-sample prediction.">
+    <title>Recurrence Lab &middot; Law, chance, or mixture?</title>
+    <style>
+/* Recurrence Lab — standalone stylesheet
+   Design tokens for the inference workbench. */
+
+:root {
+  color-scheme: light;
+  --bg: #f5f7fb;
+  --surface: #ffffff;
+  --surface-soft: #edf3ff;
+  --surface-strong: #0d1729;
+  --text: #0d1729;
+  --muted: #617086;
+  --subtle: #8b99ad;
+  --line: #dce4ef;
+  --blue: #0b65d8;
+  --blue-dark: #064fb0;
+  --blue-soft: #dceaff;
+  --amber: #f59e0b;
+  --amber-soft: #fff3d5;
+  --green: #12b981;
+  --green-soft: #dbf8ec;
+  --danger: #e65f6a;
+  --danger-soft: #fde8ea;
+  --violet: #7c5cf0;
+  --violet-soft: #ece7fe;
+  --shadow: 0 22px 60px rgba(23, 38, 62, 0.12);
+  --shadow-sm: 0 6px 18px rgba(23, 38, 62, 0.08);
+  --radius: 20px;
+  --radius-sm: 12px;
+  --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  line-height: 1.5;
+}
+
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+h1, h2, h3, h4 { margin: 0; line-height: 1.25; }
+p { margin: 0; }
+
+/* ---------- Top bar ---------- */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  height: 72px;
+  padding: 0 24px;
+  background: rgba(255, 255, 255, 0.92);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(18px);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.brand-mark {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 13px;
+  background: var(--text);
+  color: #fff;
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.brand strong { display: block; font-size: 0.95rem; }
+.brand small { display: block; color: var(--muted); font-size: 0.76rem; }
+
+.topbar-spacer { flex: 1; }
+
+.top-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+/* ---------- Buttons ---------- */
+
+.primary-button,
+.ghost-button,
+.chip-button {
+  border-radius: 999px;
+  font-weight: 650;
+  font-size: 0.85rem;
+  transition: transform 0.12s ease, background 0.16s ease, border-color 0.16s ease;
+}
+
+.primary-button {
+  padding: 10px 20px;
+  border: 1px solid var(--blue);
+  background: var(--blue);
+  color: #fff;
+}
+.primary-button:hover:not(:disabled) { background: var(--blue-dark); border-color: var(--blue-dark); }
+
+.ghost-button {
+  padding: 10px 18px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+}
+.ghost-button:hover:not(:disabled) { border-color: var(--blue); color: var(--blue); }
+
+.chip-button {
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.79rem;
+}
+.chip-button:hover { border-color: var(--blue); color: var(--blue); }
+
+.primary-button:disabled,
+.ghost-button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ---------- Layout ---------- */
+
+.page {
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: 28px 24px 80px;
+  display: grid;
+  gap: 22px;
+}
+
+.masthead { display: grid; gap: 10px; max-width: 880px; }
+.section-kicker {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--blue);
+}
+.masthead h1 { font-size: clamp(1.6rem, 3vw, 2.3rem); letter-spacing: -0.02em; }
+.masthead p { color: var(--muted); font-size: 0.96rem; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 22px;
+  box-shadow: var(--shadow-sm);
+}
+
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.card-head h2 { font-size: 1.05rem; }
+.card-head h3 { font-size: 0.95rem; }
+.card-head p { color: var(--muted); font-size: 0.84rem; margin-top: 4px; }
+
+.split { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 22px; }
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+
+/* ---------- Intake ---------- */
+
+.intake-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 22px; }
+
+textarea.data-input {
+  width: 100%;
+  min-height: 230px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #fbfcff;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  line-height: 1.65;
+  resize: vertical;
+}
+textarea.data-input:focus { outline: 2px solid var(--blue-soft); border-color: var(--blue); }
+
+.field { display: grid; gap: 6px; margin-bottom: 12px; }
+.field label { font-size: 0.78rem; font-weight: 650; color: var(--muted); }
+.field input, .field select {
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.field input:focus, .field select:focus { outline: 2px solid var(--blue-soft); border-color: var(--blue); }
+
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.sample-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+
+.hint {
+  font-size: 0.78rem;
+  color: var(--subtle);
+  line-height: 1.55;
+}
+.hint code {
+  font-family: var(--mono);
+  background: var(--surface-soft);
+  padding: 1px 5px;
+  border-radius: 5px;
+  font-size: 0.94em;
+}
+
+.parse-status {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.83rem;
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+}
+.parse-status.is-ok { background: var(--green-soft); border-color: rgba(18, 185, 129, 0.3); }
+.parse-status.is-warn { background: var(--amber-soft); border-color: rgba(245, 158, 11, 0.35); }
+.parse-status.is-bad { background: var(--danger-soft); border-color: rgba(230, 95, 106, 0.35); }
+.parse-status ul { margin: 8px 0 0; padding-left: 18px; color: var(--muted); }
+.parse-status li { margin-bottom: 2px; }
+
+/* ---------- Verdict banner ---------- */
+
+.verdict {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 20px;
+  padding: 20px 24px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+.verdict-badge {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  font-size: 1.5rem;
+  background: var(--surface-soft);
+}
+.verdict h2 { font-size: 1.12rem; margin-bottom: 4px; }
+.verdict p { color: var(--muted); font-size: 0.87rem; }
+.verdict-cta { display: grid; gap: 8px; justify-items: end; }
+
+.verdict.mode-pattern { border-color: rgba(124, 92, 240, 0.4); background: linear-gradient(120deg, var(--violet-soft), var(--surface) 65%); }
+.verdict.mode-pattern .verdict-badge { background: var(--violet-soft); }
+.verdict.mode-random { border-color: rgba(11, 101, 216, 0.35); background: linear-gradient(120deg, var(--blue-soft), var(--surface) 65%); }
+.verdict.mode-random .verdict-badge { background: var(--blue-soft); }
+.verdict.mode-mixed { border-color: rgba(245, 158, 11, 0.45); background: linear-gradient(120deg, var(--amber-soft), var(--surface) 65%); }
+.verdict.mode-mixed .verdict-badge { background: var(--amber-soft); }
+.verdict.mode-insufficient { border-color: rgba(230, 95, 106, 0.4); background: linear-gradient(120deg, var(--danger-soft), var(--surface) 65%); }
+.verdict.mode-insufficient .verdict-badge { background: var(--danger-soft); }
+
+/* ---------- Tool tabs ---------- */
+
+.tool-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.tool-tab {
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px;
+  text-align: left;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+.tool-tab:hover { border-color: var(--blue); transform: translateY(-1px); }
+.tool-tab.is-active {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px var(--blue-soft);
+}
+.tool-tab .tool-num {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--blue);
+}
+.tool-tab strong { font-size: 0.95rem; }
+.tool-tab span.tool-sub { font-size: 0.79rem; color: var(--muted); }
+.tool-tab .tool-flag {
+  justify-self: start;
+  margin-top: 4px;
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--muted);
+}
+.tool-tab .tool-flag.is-recommended { background: var(--green-soft); color: #0a7a55; }
+
+/* ---------- Metrics ---------- */
+
+.metric {
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: #fbfcff;
+}
+.metric span { display: block; font-size: 0.74rem; color: var(--muted); font-weight: 600; }
+.metric strong { display: block; font-size: 1.32rem; letter-spacing: -0.02em; margin-top: 3px; }
+.metric small { display: block; font-size: 0.74rem; color: var(--subtle); margin-top: 2px; }
+.metric.is-good strong { color: #0a7a55; }
+.metric.is-bad strong { color: var(--danger); }
+.metric.is-warn strong { color: #a06508; }
+
+/* ---------- Tables ---------- */
+
+.table-wrap { overflow-x: auto; border-radius: var(--radius-sm); border: 1px solid var(--line); }
+table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-soft);
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 0.73rem;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+tbody td { padding: 9px 12px; border-top: 1px solid var(--line); white-space: nowrap; }
+tbody tr:hover { background: #fafcff; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: 0.8rem; }
+.ball {
+  display: inline-grid;
+  place-items: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--surface-strong);
+  color: #fff;
+  font-weight: 750;
+  font-size: 0.79rem;
+  font-variant-numeric: tabular-nums;
+}
+.ball.is-hot { background: var(--danger); }
+.ball.is-cold { background: var(--blue); }
+.ball.is-flag { background: var(--violet); }
+
+.tag {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.71rem;
+  font-weight: 700;
+  background: var(--surface-soft);
+  color: var(--muted);
+}
+.tag.is-sig { background: var(--danger-soft); color: #b03a45; }
+.tag.is-null { background: var(--green-soft); color: #0a7a55; }
+
+/* ---------- Prediction balls ---------- */
+
+.prediction-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.pred-ball {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  font-size: 1.1rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  background: linear-gradient(160deg, var(--blue), var(--blue-dark));
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+.pred-ball.is-law { background: linear-gradient(160deg, #8b6df3, #5b3fd0); }
+.pred-ball.is-hybrid { background: linear-gradient(160deg, #f5a623, #dd7f06); }
+
+/* ---------- Charts ---------- */
+
+.chart { width: 100%; display: block; overflow: visible; }
+.chart-caption { font-size: 0.77rem; color: var(--subtle); margin-top: 8px; }
+
+/* ---------- Formula / callouts ---------- */
+
+.formula {
+  font-family: var(--mono);
+  font-size: 0.92rem;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-strong);
+  color: #eaf1ff;
+  overflow-x: auto;
+}
+
+.callout {
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--blue);
+  background: var(--surface-soft);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.callout strong { color: var(--text); }
+.callout.is-warn { border-left-color: var(--amber); background: var(--amber-soft); }
+.callout.is-danger { border-left-color: var(--danger); background: var(--danger-soft); }
+.callout.is-good { border-left-color: var(--green); background: var(--green-soft); }
+
+.empty-state {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--subtle);
+  font-size: 0.9rem;
+}
+
+.tool-panel { display: none; }
+.tool-panel.is-active { display: grid; gap: 20px; }
+
+.stack { display: grid; gap: 16px; }
+.row-between { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+.slider-row { display: grid; gap: 6px; margin-bottom: 14px; }
+.slider-row .row-between { font-size: 0.79rem; color: var(--muted); font-weight: 600; }
+.slider-row input[type="range"] { width: 100%; accent-color: var(--blue); }
+.slider-row output { font-family: var(--mono); color: var(--text); font-weight: 700; }
+
+.spinner-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--blue-soft);
+  border-top-color: var(--blue);
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.footnote { font-size: 0.78rem; color: var(--subtle); line-height: 1.6; }
+.footnote strong { color: var(--muted); }
+
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.77rem; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.swatch { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 1080px) {
+  .split, .intake-grid { grid-template-columns: minmax(0, 1fr); }
+  .tool-tabs { grid-template-columns: minmax(0, 1fr); }
+  .verdict { grid-template-columns: auto minmax(0, 1fr); }
+  .verdict-cta { grid-column: 1 / -1; justify-items: start; }
+}
+
+@media (max-width: 640px) {
+  .topbar { height: auto; padding: 12px 16px; flex-wrap: wrap; }
+  .page { padding: 20px 14px 60px; }
+  .card { padding: 16px; }
+  .field-row { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* ---------- Print ---------- */
+@media print {
+  .topbar, .tool-tabs, .top-actions, .sample-row { display: none !important; }
+  .card { box-shadow: none; break-inside: avoid; }
+  .tool-panel { display: grid !important; }
+}
+
+</style>
+  </head>
+  <body>
+    <header class="topbar">
+      <span class="brand" aria-label="Recurrence Lab">
+        <span class="brand-mark">RL</span>
+        <span>
+          <strong>Recurrence Lab</strong>
+          <small>Inference workbench</small>
+        </span>
+      </span>
+      <div class="topbar-spacer"></div>
+      <div class="top-actions">
+        <button class="ghost-button" type="button" id="btnMethod">Method</button>
+        <button class="ghost-button" type="button" id="btnExport" disabled>Export report</button>
+        <button class="primary-button" type="button" id="btnAnalyze">Run analysis</button>
+      </div>
+    </header>
+
+    <main class="page">
+      <section class="masthead">
+        <p class="section-kicker">Recurrence analysis</p>
+        <h1>Does this series hide a law, or is it chance wearing a pattern?</h1>
+        <p>
+          Paste any draw-style history. The lab first tests whether the recurrence you see is
+          distinguishable from exchangeable sampling without replacement, then routes you to the
+          tool that assumption justifies. Every model is scored on draws it never saw.
+        </p>
+      </section>
+
+      <!-- ============ INTAKE ============ -->
+      <section class="card" aria-labelledby="intakeTitle">
+        <div class="card-head">
+          <div>
+            <h2 id="intakeTitle">1 &middot; Observations</h2>
+            <p>One draw per line. Dates and separators are ignored; a <code>|</code> or <code>+</code> marks bonus numbers.</p>
+          </div>
+          <div class="sample-row" role="group" aria-label="Load a sample corpus">
+            <button class="chip-button" type="button" data-sample="random">Pure chance</button>
+            <button class="chip-button" type="button" data-sample="mixed">Biased mechanism</button>
+            <button class="chip-button" type="button" data-sample="law">Deterministic law</button>
+            <button class="chip-button" type="button" data-sample="drift">Regime shift</button>
+            <button class="chip-button" type="button" id="btnClear">Clear</button>
+          </div>
+        </div>
+
+        <div class="intake-grid">
+          <div>
+            <label class="hint" for="dataInput">Draw history</label>
+            <textarea id="dataInput" class="data-input" spellcheck="false"
+              placeholder="2026-01-03  4 8 15 16 23 42&#10;2026-01-07  7 11 19 23 31 44&#10;2026-01-10  1 2 3 4 5 6"
+              aria-describedby="parseStatus"></textarea>
+            <input type="file" id="fileInput" accept=".txt,.csv,.tsv,text/*" hidden>
+            <div class="row-between" style="margin-top:10px">
+              <button class="ghost-button" type="button" id="btnUpload">Upload CSV / TXT</button>
+              <span class="hint" id="detectHint"></span>
+            </div>
+            <div class="parse-status" id="parseStatus">Waiting for observations.</div>
+          </div>
+
+          <aside>
+            <h3 style="font-size:0.9rem;margin-bottom:12px">Draw structure</h3>
+            <p class="hint" style="margin-bottom:14px">
+              This is the inductive bias. Telling the model the true pool and pick count is
+              what lets it learn from a hundred draws instead of a million.
+            </p>
+            <div class="field-row">
+              <div class="field">
+                <label for="cfgMin">Pool min</label>
+                <input type="number" id="cfgMin" value="1" min="0" max="999">
+              </div>
+              <div class="field">
+                <label for="cfgMax">Pool max</label>
+                <input type="number" id="cfgMax" value="49" min="2" max="999">
+              </div>
+            </div>
+            <div class="field">
+              <label for="cfgPicks">Numbers drawn per draw (k)</label>
+              <input type="number" id="cfgPicks" value="6" min="1" max="50">
+            </div>
+            <div class="field">
+              <label for="cfgReplace">Sampling</label>
+              <select id="cfgReplace">
+                <option value="without">Without replacement</option>
+                <option value="with">With replacement</option>
+              </select>
+            </div>
+            <div class="callout" id="priorNote">
+              Null hypothesis: every number is equally likely, q = k/N.
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ============ VERDICT ============ -->
+      <section id="verdictHost" hidden></section>
+
+      <!-- ============ TOOL SELECTOR ============ -->
+      <section id="toolSection" hidden>
+        <div class="tool-tabs" role="tablist" aria-label="Analysis tools">
+          <button class="tool-tab is-active" role="tab" aria-selected="true" aria-controls="panel-analytic" id="tab-analytic" data-tool="analytic">
+            <span class="tool-num">Tool 1 &middot; Pattern detected</span>
+            <strong>Analytic derivation</strong>
+            <span class="tool-sub">Search a restricted class of closed-form recurrences and validate out of sample.</span>
+            <span class="tool-flag" data-flag="analytic">—</span>
+          </button>
+          <button class="tool-tab" role="tab" aria-selected="false" aria-controls="panel-stochastic" id="tab-stochastic" data-tool="stochastic">
+            <span class="tool-num">Tool 2 &middot; No pattern</span>
+            <strong>Stochastic recurrence</strong>
+            <span class="tool-sub">Beta-Binomial frequency model shrunk toward the hypergeometric null.</span>
+            <span class="tool-flag" data-flag="stochastic">—</span>
+          </button>
+          <button class="tool-tab" role="tab" aria-selected="false" aria-controls="panel-hybrid" id="tab-hybrid" data-tool="hybrid">
+            <span class="tool-num">Tool 3 &middot; Mixed</span>
+            <strong>Hybrid ensemble</strong>
+            <span class="tool-sub">Online mixture that learns how much is law and how much is chance.</span>
+            <span class="tool-flag" data-flag="hybrid">—</span>
+          </button>
+        </div>
+      </section>
+
+      <section id="panel-analytic" class="tool-panel is-active" role="tabpanel" aria-labelledby="tab-analytic" hidden></section>
+      <section id="panel-stochastic" class="tool-panel" role="tabpanel" aria-labelledby="tab-stochastic" hidden></section>
+      <section id="panel-hybrid" class="tool-panel" role="tabpanel" aria-labelledby="tab-hybrid" hidden></section>
+
+      <!-- ============ MONTE CARLO PREDICTION ============ -->
+      <section id="predictionHost" hidden></section>
+
+      <section class="card" id="methodCard" hidden aria-labelledby="methodTitle">
+        <div class="card-head">
+          <div>
+            <h2 id="methodTitle">Method &amp; guardrails</h2>
+            <p>What this lab will and will not claim.</p>
+          </div>
+          <button class="chip-button" type="button" id="btnMethodClose">Close</button>
+        </div>
+        <div class="grid-2">
+          <div class="callout">
+            <strong>1 &middot; Restricted hypothesis class.</strong>
+            Tool 1 searches only closed-form recurrences (constant, arithmetic, affine mod M,
+            second-order linear mod M, periodic cycles, low-degree polynomials). A universal
+            function approximator would fit any history perfectly and predict nothing.
+          </div>
+          <div class="callout">
+            <strong>2 &middot; Probabilistic conclusions.</strong>
+            Nothing is reported as certain. Frequencies carry Bayesian credible intervals,
+            deviations carry FDR-controlled p-values, and analytic laws are capped below
+            certainty about any future draw.
+          </div>
+          <div class="callout">
+            <strong>3 &middot; Prior knowledge as structure.</strong>
+            Sampling without replacement, exchangeability and q = k/N are hard-wired, so the
+            model starts at the right answer for a fair mechanism and only moves away from it
+            when the evidence pays for the move.
+          </div>
+          <div class="callout is-warn">
+            <strong>4 &middot; Judged on new observations.</strong>
+            Every tool is walk-forward tested: refit on a prefix, scored on the next unseen
+            draw, repeated. Reproducing history earns no credit. If a model cannot beat the
+            uniform baseline out of sample, the lab says so.
+          </div>
+        </div>
+        <div class="callout is-danger" style="margin-top:16px">
+          <strong>On lotteries specifically.</strong> For a fair, well-maintained lottery the
+          correct conclusion is Tool 2 with zero lift: draws are independent, the past carries
+          no information about the future, and no staking scheme changes the negative expected
+          value. This lab is built to reach that conclusion honestly when it is true &mdash; and
+          it will tell you when your "pattern" is the shape random data always has.
+        </div>
+      </section>
+    </main>
+
+    <script>
+/*
+ * Recurrence Lab — inference engine
+ * ---------------------------------
+ * Pure, dependency-free inference engine for recurrence analysis of
+ * draw-style observations (k picks without replacement from a pool of N).
+ *
+ * Design contract (the guardrails):
+ *   1. The hypothesis class is restricted. Every model here encodes an
+ *      explicit assumption about the generating process. Nothing is a
+ *      free-form curve fitter.
+ *   2. Conclusions are probabilistic, never certain. Every estimate ships
+ *      with an interval, a p-value, or an out-of-sample score.
+ *   3. Prior knowledge (exchangeability, hypergeometric sampling without
+ *      replacement, the Law of Large Numbers) is injected as structure so
+ *      the effective complexity that has to be learned from data is small.
+ *
+ * Nothing in this file touches the DOM.
+ */
+(function (root, factory) {
+  var api = factory();
+  if (typeof module === "object" && module.exports) module.exports = api;
+  root.RecurrenceEngine = api;
+})(typeof globalThis !== "undefined" ? globalThis : this, function () {
+  "use strict";
+
+  /* ====================================================================
+   * 0. Numerical helpers (special functions, tests, small utilities)
+   * ================================================================== */
+
+  var LN2 = Math.LN2;
+
+  function log2(x) {
+    return Math.log(x) / LN2;
+  }
+
+  function clamp(x, lo, hi) {
+    return x < lo ? lo : x > hi ? hi : x;
+  }
+
+  function sum(arr) {
+    var t = 0;
+    for (var i = 0; i < arr.length; i++) t += arr[i];
+    return t;
+  }
+
+  function mean(arr) {
+    return arr.length ? sum(arr) / arr.length : 0;
+  }
+
+  function variance(arr) {
+    if (arr.length < 2) return 0;
+    var m = mean(arr);
+    var t = 0;
+    for (var i = 0; i < arr.length; i++) t += (arr[i] - m) * (arr[i] - m);
+    return t / (arr.length - 1);
+  }
+
+  function range(n) {
+    var out = new Array(n);
+    for (var i = 0; i < n; i++) out[i] = i;
+    return out;
+  }
+
+  function mod(a, m) {
+    return ((a % m) + m) % m;
+  }
+
+  // Log-gamma (Lanczos approximation).
+  var LANCZOS = [
+    676.5203681218851, -1259.1392167224028, 771.32342877765313,
+    -176.61502916214059, 12.507343278686905, -0.13857109526572012,
+    9.9843695780195716e-6, 1.5056327351493116e-7
+  ];
+
+  function logGamma(z) {
+    if (z < 0.5) {
+      return Math.log(Math.PI / Math.sin(Math.PI * z)) - logGamma(1 - z);
+    }
+    z -= 1;
+    var x = 0.99999999999980993;
+    for (var i = 0; i < LANCZOS.length; i++) x += LANCZOS[i] / (z + i + 1);
+    var t = z + LANCZOS.length - 0.5;
+    return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
+  }
+
+  // Regularized lower incomplete gamma P(s, x) by series expansion.
+  function gammaPSeries(s, x) {
+    var ap = s;
+    var del = 1 / s;
+    var acc = del;
+    for (var n = 0; n < 500; n++) {
+      ap += 1;
+      del *= x / ap;
+      acc += del;
+      if (Math.abs(del) < Math.abs(acc) * 1e-14) break;
+    }
+    return acc * Math.exp(-x + s * Math.log(x) - logGamma(s));
+  }
+
+  // Regularized upper incomplete gamma Q(s, x) by continued fraction.
+  function gammaQCF(s, x) {
+    var tiny = 1e-300;
+    var b = x + 1 - s;
+    var c = 1 / tiny;
+    var d = 1 / b;
+    var h = d;
+    for (var i = 1; i <= 500; i++) {
+      var an = -i * (i - s);
+      b += 2;
+      d = an * d + b;
+      if (Math.abs(d) < tiny) d = tiny;
+      c = b + an / c;
+      if (Math.abs(c) < tiny) c = tiny;
+      d = 1 / d;
+      var del = d * c;
+      h *= del;
+      if (Math.abs(del - 1) < 1e-14) break;
+    }
+    return Math.exp(-x + s * Math.log(x) - logGamma(s)) * h;
+  }
+
+  function gammaQ(s, x) {
+    if (x <= 0) return 1;
+    if (x < s + 1) return 1 - gammaPSeries(s, x);
+    return gammaQCF(s, x);
+  }
+
+  /** Upper-tail p-value of a chi-square statistic. */
+  function chiSquareP(stat, df) {
+    if (!(df > 0) || !isFinite(stat) || stat <= 0) return 1;
+    return clamp(gammaQ(df / 2, stat / 2), 0, 1);
+  }
+
+  // Error function (Abramowitz & Stegun 7.1.26).
+  function erf(x) {
+    var s = x < 0 ? -1 : 1;
+    x = Math.abs(x);
+    var t = 1 / (1 + 0.3275911 * x);
+    var y =
+      1 -
+      ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t +
+        0.254829592) *
+        t *
+        Math.exp(-x * x);
+    return s * y;
+  }
+
+  function normalCdf(z) {
+    return 0.5 * (1 + erf(z / Math.SQRT2));
+  }
+
+  /** Two-sided normal-approximation p-value for a z score. */
+  function twoSidedZP(z) {
+    return clamp(2 * (1 - normalCdf(Math.abs(z))), 0, 1);
+  }
+
+  // Regularized incomplete beta I_x(a, b) - continued fraction (NR 6.4).
+  function betacf(a, b, x) {
+    var tiny = 1e-300;
+    var qab = a + b;
+    var qap = a + 1;
+    var qam = a - 1;
+    var c = 1;
+    var d = 1 - (qab * x) / qap;
+    if (Math.abs(d) < tiny) d = tiny;
+    d = 1 / d;
+    var h = d;
+    for (var m = 1; m <= 300; m++) {
+      var m2 = 2 * m;
+      var aa = (m * (b - m) * x) / ((qam + m2) * (a + m2));
+      d = 1 + aa * d;
+      if (Math.abs(d) < tiny) d = tiny;
+      c = 1 + aa / c;
+      if (Math.abs(c) < tiny) c = tiny;
+      d = 1 / d;
+      h *= d * c;
+      aa = (-(a + m) * (qab + m) * x) / ((a + m2) * (qap + m2));
+      d = 1 + aa * d;
+      if (Math.abs(d) < tiny) d = tiny;
+      c = 1 + aa / c;
+      if (Math.abs(c) < tiny) c = tiny;
+      d = 1 / d;
+      var del = d * c;
+      h *= del;
+      if (Math.abs(del - 1) < 1e-13) break;
+    }
+    return h;
+  }
+
+  function incompleteBeta(a, b, x) {
+    if (x <= 0) return 0;
+    if (x >= 1) return 1;
+    var lbeta =
+      logGamma(a + b) - logGamma(a) - logGamma(b) + a * Math.log(x) + b * Math.log(1 - x);
+    var front = Math.exp(lbeta);
+    if (x < (a + 1) / (a + b + 2)) return (front * betacf(a, b, x)) / a;
+    return 1 - (Math.exp(
+      logGamma(a + b) - logGamma(a) - logGamma(b) + b * Math.log(1 - x) + a * Math.log(x)
+    ) *
+      betacf(b, a, 1 - x)) /
+      b;
+  }
+
+  /** Quantile of Beta(a, b) via bisection on the regularized incomplete beta. */
+  function betaQuantile(p, a, b) {
+    if (p <= 0) return 0;
+    if (p >= 1) return 1;
+    var lo = 0;
+    var hi = 1;
+    var mid = 0.5;
+    for (var i = 0; i < 80; i++) {
+      mid = 0.5 * (lo + hi);
+      if (incompleteBeta(a, b, mid) < p) lo = mid;
+      else hi = mid;
+    }
+    return mid;
+  }
+
+  /**
+   * Benjamini-Hochberg false discovery rate control.
+   * Returns the indices of hypotheses that survive at level q.
+   */
+  function benjaminiHochberg(pvalues, q) {
+    var idx = pvalues.map(function (p, i) {
+      return { p: p, i: i };
+    });
+    idx.sort(function (u, v) {
+      return u.p - v.p;
+    });
+    var m = idx.length;
+    var kMax = -1;
+    for (var r = 0; r < m; r++) {
+      if (idx[r].p <= ((r + 1) / m) * q) kMax = r;
+    }
+    var survivors = [];
+    for (var s = 0; s <= kMax; s++) survivors.push(idx[s].i);
+    return { survivors: survivors, threshold: kMax >= 0 ? idx[kMax].p : 0 };
+  }
+
+  /** Deterministic PRNG so generated samples are reproducible. */
+  function mulberry32(seed) {
+    var a = seed >>> 0;
+    return function () {
+      a |= 0;
+      a = (a + 0x6d2b79f5) | 0;
+      var t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  /* ====================================================================
+   * 1. Configuration + parsing
+   * ================================================================== */
+
+  var DEFAULT_CONFIG = {
+    poolMin: 1,
+    poolMax: 49,
+    picks: 6,
+    bonusPool: 0, // 0 disables the bonus pool
+    bonusPicks: 0
+  };
+
+  function normalizeConfig(cfg) {
+    var c = Object.assign({}, DEFAULT_CONFIG, cfg || {});
+    c.poolMin = Math.max(0, Math.round(c.poolMin));
+    c.poolMax = Math.max(c.poolMin + 1, Math.round(c.poolMax));
+    c.poolSize = c.poolMax - c.poolMin + 1;
+    c.picks = clamp(Math.round(c.picks), 1, c.poolSize);
+    c.bonusPool = Math.max(0, Math.round(c.bonusPool));
+    c.bonusPicks = c.bonusPool > 0 ? clamp(Math.round(c.bonusPicks), 0, c.bonusPool) : 0;
+    return c;
+  }
+
+  var DATE_RE = /^\s*(\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/;
+
+  /**
+   * Parse free-form pasted text into draws.
+   * Accepts one draw per line, any separator, optional leading date,
+   * optional bonus numbers after a `|` or `+`.
+   */
+  function parseDraws(text, cfg) {
+    var config = normalizeConfig(cfg);
+    var lines = String(text || "").split(/\r?\n/);
+    var draws = [];
+    var issues = [];
+
+    for (var li = 0; li < lines.length; li++) {
+      var raw = lines[li];
+      var line = raw.trim();
+      if (!line || /^[#/;]/.test(line)) continue;
+
+      var date = null;
+      var dm = line.match(DATE_RE);
+      if (dm) {
+        date = dm[1];
+        line = line.slice(dm[0].length);
+      }
+
+      var parts = line.split(/[|+]/);
+      var mainNums = extractInts(parts[0]);
+      var bonusNums = parts.length > 1 ? extractInts(parts.slice(1).join(" ")) : [];
+
+      if (!mainNums.length) continue;
+
+      // A leading standalone index column ("12: 4 8 15 ...") is discarded
+      // when it makes the row exactly one number too long.
+      if (!date && mainNums.length === config.picks + 1 && /^\s*\d+\s*[:.)]/.test(line)) {
+        mainNums = mainNums.slice(1);
+      }
+
+      var bad = mainNums.filter(function (n) {
+        return n < config.poolMin || n > config.poolMax;
+      });
+      var dupes = new Set(mainNums).size !== mainNums.length;
+
+      var entry = {
+        line: li + 1,
+        date: date,
+        numbers: mainNums.slice().sort(function (a, b) {
+          return a - b;
+        }),
+        raw: mainNums.slice(),
+        bonus: bonusNums,
+        valid: true,
+        notes: []
+      };
+
+      if (mainNums.length !== config.picks) {
+        entry.valid = false;
+        entry.notes.push(mainNums.length + " numbers, expected " + config.picks);
+      }
+      if (bad.length) {
+        entry.valid = false;
+        entry.notes.push("out of pool range: " + bad.join(", "));
+      }
+      if (dupes) {
+        entry.valid = false;
+        entry.notes.push("repeated number inside a single draw");
+      }
+      if (!entry.valid) issues.push("Line " + (li + 1) + ": " + entry.notes.join("; "));
+      draws.push(entry);
+    }
+
+    var valid = draws.filter(function (d) {
+      return d.valid;
+    });
+
+    return {
+      config: config,
+      draws: valid,
+      rejected: draws.filter(function (d) {
+        return !d.valid;
+      }),
+      issues: issues,
+      total: draws.length
+    };
+  }
+
+  function extractInts(str) {
+    var m = String(str || "").match(/\d+/g);
+    return m ? m.map(Number) : [];
+  }
+
+  /** Infer pool size and picks-per-draw from raw pasted text. */
+  function autoDetectConfig(text) {
+    var lines = String(text || "").split(/\r?\n/);
+    var counts = {};
+    var max = 0;
+    var min = Infinity;
+    var rows = 0;
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].trim();
+      if (!line || /^[#/;]/.test(line)) continue;
+      var dm = line.match(DATE_RE);
+      if (dm) line = line.slice(dm[0].length);
+      var nums = extractInts(line.split(/[|+]/)[0]);
+      if (nums.length < 2) continue;
+      rows++;
+      counts[nums.length] = (counts[nums.length] || 0) + 1;
+      for (var j = 0; j < nums.length; j++) {
+        if (nums[j] > max) max = nums[j];
+        if (nums[j] < min) min = nums[j];
+      }
+    }
+    if (!rows) return null;
+    var picks = Object.keys(counts).sort(function (a, b) {
+      return counts[b] - counts[a];
+    })[0];
+    return normalizeConfig({
+      poolMin: min === 0 ? 0 : 1,
+      poolMax: max,
+      picks: Number(picks)
+    });
+  }
+
+  /* ====================================================================
+   * 2. Summary statistics over a draw history
+   * ================================================================== */
+
+  function summarize(draws, config) {
+    var N = config.poolSize;
+    var counts = new Array(N).fill(0);
+    var lastSeen = new Array(N).fill(-1);
+    var gaps = [];
+    for (var i = 0; i < N; i++) gaps.push([]);
+
+    for (var t = 0; t < draws.length; t++) {
+      var nums = draws[t].numbers;
+      for (var j = 0; j < nums.length; j++) {
+        var idx = nums[j] - config.poolMin;
+        counts[idx]++;
+        if (lastSeen[idx] >= 0) gaps[idx].push(t - lastSeen[idx]);
+        lastSeen[idx] = t;
+      }
+    }
+
+    var currentGap = lastSeen.map(function (t) {
+      return t < 0 ? draws.length : draws.length - 1 - t;
+    });
+
+    return {
+      N: N,
+      D: draws.length,
+      k: config.picks,
+      counts: counts,
+      lastSeen: lastSeen,
+      currentGap: currentGap,
+      gaps: gaps,
+      expectedCount: (draws.length * config.picks) / N,
+      sums: draws.map(function (d) {
+        return sum(d.numbers);
+      })
+    };
+  }
+
+  function label(idx, config) {
+    return idx + config.poolMin;
+  }
+
+  /* ====================================================================
+   * 3. Signal detector - which of the three tools does the data justify?
+   * ================================================================== */
+
+  /**
+   * Runs the guardrail diagnostics: is the observed recurrence structure
+   * distinguishable from exchangeable sampling without replacement?
+   */
+  function diagnostics(draws, config) {
+    var s = summarize(draws, config);
+    var N = s.N;
+    var D = s.D;
+    var k = s.k;
+    var q = k / N; // per-draw appearance probability under the null
+
+    // --- Frequency goodness-of-fit vs the uniform / hypergeometric null ---
+    var E = s.expectedCount;
+    var chi = 0;
+    for (var i = 0; i < N; i++) chi += ((s.counts[i] - E) * (s.counts[i] - E)) / (E || 1);
+    var chiDf = N - 1;
+    var chiP = chiSquareP(chi, chiDf);
+
+    // --- Per-number binomial tests with FDR control (multiplicity guard) ---
+    var sd = Math.sqrt(D * q * (1 - q)) || 1;
+    var pvals = [];
+    var zScores = [];
+    for (var n = 0; n < N; n++) {
+      var z = (s.counts[n] - D * q) / sd;
+      zScores.push(z);
+      pvals.push(twoSidedZP(z));
+    }
+    var fdr = benjaminiHochberg(pvals, 0.05);
+
+    // --- Dispersion: are counts more variable than the binomial null? ---
+    var obsVar = variance(s.counts);
+    var nullVar = D * q * (1 - q);
+    var dispersion = nullVar > 0 ? obsVar / nullVar : 1;
+
+    // --- Non-stationarity: first half vs second half contingency test ---
+    var half = Math.floor(D / 2);
+    var stationarity = { chi: 0, p: 1, df: Math.max(1, N - 1), testable: false };
+    if (half >= 8) {
+      var c1 = new Array(N).fill(0);
+      var c2 = new Array(N).fill(0);
+      for (var t = 0; t < D; t++) {
+        var target = t < half ? c1 : c2;
+        for (var j = 0; j < draws[t].numbers.length; j++) {
+          target[draws[t].numbers[j] - config.poolMin]++;
+        }
+      }
+      var n1 = half * k;
+      var n2 = (D - half) * k;
+      var stat = 0;
+      for (var m = 0; m < N; m++) {
+        var tot = c1[m] + c2[m];
+        if (!tot) continue;
+        var e1 = (tot * n1) / (n1 + n2);
+        var e2 = (tot * n2) / (n1 + n2);
+        if (e1 > 0) stat += ((c1[m] - e1) * (c1[m] - e1)) / e1;
+        if (e2 > 0) stat += ((c2[m] - e2) * (c2[m] - e2)) / e2;
+      }
+      stationarity = {
+        chi: stat,
+        df: N - 1,
+        p: chiSquareP(stat, N - 1),
+        testable: true
+      };
+    }
+
+    // --- Serial dependence: lag-1 autocorrelation of draw sums ---
+    var acf1 = autocorr(s.sums, 1);
+    var acfSe = D > 3 ? 1 / Math.sqrt(D) : 1;
+    var acfZ = acf1 / acfSe;
+
+    // --- Gap law: observed mean recurrence interval vs geometric 1/q ---
+    var allGaps = [];
+    for (var g = 0; g < N; g++) allGaps = allGaps.concat(s.gaps[g]);
+    var gapMean = mean(allGaps);
+    var gapExpected = 1 / q;
+    var gapCv = allGaps.length > 2 ? Math.sqrt(variance(allGaps)) / (gapMean || 1) : 1;
+
+    // --- Entropy ratio (1.0 == perfectly flat empirical distribution) ---
+    var totalPicks = D * k || 1;
+    var H = 0;
+    for (var e = 0; e < N; e++) {
+      var p = s.counts[e] / totalPicks;
+      if (p > 0) H -= p * log2(p);
+    }
+    var entropyRatio = H / log2(N);
+
+    // --- Deterministic structure probe (cheap analytic screen) ---
+    var analytic = deriveAnalyticLaw(draws, config, { quick: true });
+    var structureScore = analytic.best ? analytic.best.valAccuracy : 0;
+
+    // --- Verdict ---
+    var randomnessEvidence = [
+      chiP > 0.05,
+      fdr.survivors.length === 0,
+      Math.abs(acfZ) < 2,
+      stationarity.p > 0.05,
+      entropyRatio > 0.985
+    ].filter(Boolean).length;
+
+    var mode;
+    var confidence;
+    if (structureScore >= 0.85) {
+      mode = "pattern";
+      confidence = structureScore;
+    } else if (structureScore >= 0.3 || randomnessEvidence <= 3) {
+      mode = "mixed";
+      confidence = 1 - Math.abs(randomnessEvidence - 3) / 5;
+    } else {
+      mode = "random";
+      confidence = randomnessEvidence / 5;
+    }
+    if (D < 12) {
+      mode = D < 4 ? "insufficient" : mode;
+    }
+
+    return {
+      summary: s,
+      chi: { stat: chi, df: chiDf, p: chiP },
+      perNumber: { z: zScores, p: pvals, fdr: fdr },
+      dispersion: dispersion,
+      stationarity: stationarity,
+      autocorrelation: { lag1: acf1, z: acfZ },
+      gaps: {
+        observedMean: gapMean,
+        expectedMean: gapExpected,
+        cv: gapCv,
+        n: allGaps.length,
+        all: allGaps
+      },
+      entropyRatio: entropyRatio,
+      structureScore: structureScore,
+      analyticProbe: analytic,
+      randomnessEvidence: randomnessEvidence,
+      mode: mode,
+      confidence: clamp(confidence, 0, 1)
+    };
+  }
+
+  function autocorr(series, lag) {
+    if (series.length <= lag + 2) return 0;
+    var m = mean(series);
+    var num = 0;
+    var den = 0;
+    for (var i = 0; i < series.length; i++) {
+      den += (series[i] - m) * (series[i] - m);
+      if (i + lag < series.length) num += (series[i] - m) * (series[i + lag] - m);
+    }
+    return den ? num / den : 0;
+  }
+
+  /* ====================================================================
+   * 4. TOOL 1 - Analytic derivation of a generating law
+   * --------------------------------------------------------------------
+   * Restricted hypothesis class. Each hypothesis is a closed-form
+   * recurrence with a handful of integer parameters, fitted on a training
+   * prefix and *scored on a held-out suffix it never saw*. A law is only
+   * reported if it survives out-of-sample validation. Ties are broken by
+   * minimum description length, not by training fit.
+   * ================================================================== */
+
+  function seriesViews(draws, config) {
+    var views = [];
+    var k = config.picks;
+    for (var pos = 0; pos < k; pos++) {
+      views.push({
+        id: "pos" + pos,
+        name: "Position " + (pos + 1) + " (ascending)",
+        values: draws.map(function (d) {
+          return d.numbers[pos];
+        }),
+        modulus: config.poolMax + 1,
+        offset: 0
+      });
+    }
+    views.push({
+      id: "sum",
+      name: "Draw sum",
+      values: draws.map(function (d) {
+        return sum(d.numbers);
+      }),
+      modulus: config.poolMax * config.picks + 1,
+      offset: 0
+    });
+    return views;
+  }
+
+  var HYPOTHESES = [
+    {
+      id: "constant",
+      name: "Constant law",
+      params: 1,
+      fit: function (v) {
+        var c = v[0];
+        return v.every(function (x) {
+          return x === c;
+        })
+          ? { c: c }
+          : null;
+      },
+      predict: function (p) {
+        return p.c;
+      },
+      formula: function (p) {
+        return "xₙ = " + p.c;
+      }
+    },
+    {
+      id: "arithmetic",
+      name: "Arithmetic progression (mod M)",
+      params: 2,
+      fit: function (v, M) {
+        if (v.length < 3) return null;
+        var d = mod(v[1] - v[0], M);
+        return { d: d, M: M, seed: v[0] };
+      },
+      predict: function (p, hist) {
+        return mod(hist[hist.length - 1] + p.d, p.M);
+      },
+      formula: function (p) {
+        return "xₙ = (xₙ₋₁ + " + p.d + ") mod " + p.M;
+      }
+    },
+    {
+      id: "affine",
+      name: "Affine recurrence (mod M)",
+      params: 3,
+      fit: function (v, M) {
+        if (v.length < 4 || M > 400) return null;
+        // Screen in O(M): for each a, b is *determined* by one transition.
+        // Only fully verified candidates cost O(n). This is exact for any
+        // law that reproduces the anchor transition, and we anchor on
+        // several transitions so partial fits are still reachable.
+        var anchors = Math.min(4, v.length - 1);
+        var seen = new Set();
+        var best = null;
+        for (var t = 0; t < anchors; t++) {
+          for (var a = 0; a < M; a++) {
+            var b = mod(v[t + 1] - a * v[t], M);
+            var key = a * (M + 1) + b;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            var hits = 0;
+            for (var i = 1; i < v.length; i++) {
+              if (mod(a * v[i - 1] + b, M) === mod(v[i], M)) hits++;
+            }
+            var acc = hits / (v.length - 1);
+            if (!best || acc > best.acc) best = { a: a, b: b, M: M, acc: acc };
+            if (acc === 1) return { a: a, b: b, M: M };
+          }
+        }
+        return best && best.acc >= 0.9 ? { a: best.a, b: best.b, M: M } : null;
+      },
+      predict: function (p, hist) {
+        return mod(p.a * hist[hist.length - 1] + p.b, p.M);
+      },
+      formula: function (p) {
+        return "xₙ = (" + p.a + "·xₙ₋₁ + " + p.b + ") mod " + p.M;
+      }
+    },
+    {
+      id: "order2",
+      name: "Second-order linear recurrence (mod M)",
+      params: 4,
+      fit: function (v, M) {
+        if (v.length < 6 || M > 200) return null;
+        var n = v.length;
+        var total = n - 2;
+        // Accept nothing below 0.9 training accuracy, so we may abandon a
+        // candidate as soon as its misses make 0.9 unreachable. Random
+        // (a, b) pairs die within a few terms, turning the nominal
+        // O(M^2 n) sweep into roughly O(M^2) in practice.
+        var maxMiss = Math.floor(total * 0.1);
+        var best = null;
+        for (var a = 0; a < M; a++) {
+          for (var b = 0; b < M; b++) {
+            var c = mod(v[2] - a * v[1] - b * v[0], M);
+            var hits = 0;
+            var miss = 0;
+            for (var i = 2; i < n; i++) {
+              if (mod(a * v[i - 1] + b * v[i - 2] + c, M) === mod(v[i], M)) hits++;
+              else if (++miss > maxMiss) break;
+            }
+            if (miss > maxMiss) continue;
+            var acc = hits / total;
+            if (!best || acc > best.acc) best = { a: a, b: b, c: c, M: M, acc: acc };
+            if (acc === 1) return { a: a, b: b, c: c, M: M };
+          }
+        }
+        return best && best.acc >= 0.9 ? { a: best.a, b: best.b, c: best.c, M: M } : null;
+      },
+      predict: function (p, hist) {
+        var n = hist.length;
+        return mod(p.a * hist[n - 1] + p.b * hist[n - 2] + p.c, p.M);
+      },
+      formula: function (p) {
+        return (
+          "xₙ = (" + p.a + "·xₙ₋₁ + " + p.b +
+          "·xₙ₋₂ + " + p.c + ") mod " + p.M
+        );
+      }
+    },
+    {
+      id: "periodic",
+      name: "Periodic cycle",
+      params: 2,
+      fit: function (v) {
+        if (v.length < 6) return null;
+        for (var p = 2; p <= Math.floor(v.length / 2); p++) {
+          var ok = true;
+          for (var i = p; i < v.length; i++) {
+            if (v[i] !== v[i - p]) {
+              ok = false;
+              break;
+            }
+          }
+          if (ok) return { period: p, cycle: v.slice(0, p) };
+        }
+        return null;
+      },
+      predict: function (p, hist) {
+        return hist[hist.length - p.period];
+      },
+      formula: function (p) {
+        return "xₙ = xₙ₋" + p.period + "  (cycle of " + p.period + ")";
+      }
+    },
+    {
+      id: "polynomial",
+      name: "Polynomial in n (finite differences)",
+      params: 4,
+      fit: function (v) {
+        if (v.length < 8) return null;
+        var cur = v.slice();
+        for (var d = 1; d <= 3; d++) {
+          var next = [];
+          for (var i = 1; i < cur.length; i++) next.push(cur[i] - cur[i - 1]);
+          cur = next;
+          if (cur.length < 3) return null;
+          var allSame = cur.every(function (x) {
+            return x === cur[0];
+          });
+          if (allSame) return { degree: d, delta: cur[0], seed: v.slice() };
+        }
+        return null;
+      },
+      predict: function (p, hist) {
+        // Extrapolate by rebuilding the difference table from history.
+        var tables = [hist.slice()];
+        for (var d = 1; d <= p.degree; d++) {
+          var prev = tables[d - 1];
+          var next = [];
+          for (var i = 1; i < prev.length; i++) next.push(prev[i] - prev[i - 1]);
+          tables.push(next);
+        }
+        var carry = p.delta;
+        for (var lvl = p.degree - 1; lvl >= 0; lvl--) {
+          var row = tables[lvl];
+          carry = row[row.length - 1] + carry;
+        }
+        return carry;
+      },
+      formula: function (p) {
+        return "Δ^" + p.degree + "xₙ = " + p.delta + " (degree-" + p.degree + " polynomial)";
+      }
+    }
+  ];
+
+  function fitHypothesis(hyp, series, splitAt) {
+    var train = series.values.slice(0, splitAt);
+    var params = null;
+    try {
+      params = hyp.fit(train, series.modulus);
+    } catch (e) {
+      params = null;
+    }
+    if (!params) return null;
+
+    var trainHits = 0;
+    var trainTotal = 0;
+    var valHits = 0;
+    var valTotal = 0;
+    var minHist = hyp.id === "order2" ? 2 : hyp.id === "periodic" ? params.period : 1;
+
+    for (var i = Math.max(minHist, 1); i < series.values.length; i++) {
+      var hist = series.values.slice(0, i);
+      var pred;
+      try {
+        pred = hyp.predict(params, hist);
+      } catch (e2) {
+        continue;
+      }
+      var hit = pred === series.values[i] ? 1 : 0;
+      if (i < splitAt) {
+        trainHits += hit;
+        trainTotal++;
+      } else {
+        valHits += hit;
+        valTotal++;
+      }
+    }
+    if (!valTotal) return null;
+
+    var trainAcc = trainTotal ? trainHits / trainTotal : 0;
+    var valAcc = valHits / valTotal;
+    // Minimum description length: parameter cost + residual coding cost.
+    var bitsPerSymbol = log2(Math.max(2, series.modulus));
+    var descriptionBits =
+      hyp.params * bitsPerSymbol + (1 - valAcc) * valTotal * bitsPerSymbol;
+
+    var next = null;
+    try {
+      next = hyp.predict(params, series.values);
+    } catch (e3) {
+      next = null;
+    }
+
+    return {
+      hypothesis: hyp.id,
+      name: hyp.name,
+      series: series.id,
+      seriesName: series.name,
+      formula: hyp.formula(params),
+      params: params,
+      trainAccuracy: trainAcc,
+      valAccuracy: valAcc,
+      valTotal: valTotal,
+      trainTotal: trainTotal,
+      descriptionBits: descriptionBits,
+      nextValue: next
+    };
+  }
+
+  /**
+   * Search the restricted hypothesis class for a law that survives
+   * out-of-sample validation.
+   */
+  function deriveAnalyticLaw(draws, config, opts) {
+    opts = opts || {};
+    var minValAcc = opts.minValAccuracy == null ? 0.85 : opts.minValAccuracy;
+    var splitFrac = opts.splitFraction == null ? 0.7 : opts.splitFraction;
+
+    // A genuine closed-form law is identifiable from a bounded window, and
+    // on a drifting process the recent window is the more honest evidence.
+    // Capping the window keeps repeated refits linear rather than quadratic.
+    var maxWindow = opts.maxWindow == null ? 400 : opts.maxWindow;
+    if (maxWindow > 0 && draws.length > maxWindow) {
+      draws = draws.slice(draws.length - maxWindow);
+    }
+
+    if (draws.length < 6) {
+      return { candidates: [], best: null, verdict: "insufficient", positionLaws: null };
+    }
+
+    var views = seriesViews(draws, config);
+    if (opts.quick) views = views.filter(function (v) {
+      return v.id !== "sum";
+    });
+
+    var splitAt = Math.max(3, Math.floor(draws.length * splitFrac));
+    var candidates = [];
+
+    for (var v = 0; v < views.length; v++) {
+      for (var h = 0; h < HYPOTHESES.length; h++) {
+        if (opts.quick && (HYPOTHESES[h].id === "order2" || HYPOTHESES[h].id === "affine")) {
+          if (config.poolMax > 80) continue;
+        }
+        var res = fitHypothesis(HYPOTHESES[h], views[v], splitAt);
+        if (res) candidates.push(res);
+      }
+    }
+
+    candidates.sort(function (a, b) {
+      if (b.valAccuracy !== a.valAccuracy) return b.valAccuracy - a.valAccuracy;
+      return a.descriptionBits - b.descriptionBits;
+    });
+
+    var survivors = candidates.filter(function (c) {
+      return c.valAccuracy >= minValAcc;
+    });
+    survivors.sort(function (a, b) {
+      return a.descriptionBits - b.descriptionBits;
+    });
+
+    var best = survivors[0] || null;
+
+    // If every ascending-position series has its own surviving law we can
+    // reconstruct a full deterministic prediction for the next draw.
+    var positionLaws = null;
+    var perPos = [];
+    for (var p = 0; p < config.picks; p++) {
+      var lawsForPos = survivors.filter(function (c) {
+        return c.series === "pos" + p;
+      });
+      if (!lawsForPos.length) {
+        perPos = null;
+        break;
+      }
+      perPos.push(lawsForPos[0]);
+    }
+    if (perPos) {
+      var predicted = perPos.map(function (l) {
+        return l.nextValue;
+      });
+      var inRange = predicted.every(function (x) {
+        return x != null && x >= config.poolMin && x <= config.poolMax;
+      });
+      var distinct = new Set(predicted).size === predicted.length;
+      positionLaws = {
+        laws: perPos,
+        prediction: predicted.slice().sort(function (a, b) {
+          return a - b;
+        }),
+        admissible: inRange && distinct,
+        meanValAccuracy: mean(
+          perPos.map(function (l) {
+            return l.valAccuracy;
+          })
+        )
+      };
+    }
+
+    var verdict = best
+      ? best.valAccuracy >= 0.999
+        ? "exact-law"
+        : "partial-law"
+      : "no-law";
+
+    return {
+      candidates: candidates.slice(0, 20),
+      survivors: survivors,
+      best: best,
+      positionLaws: positionLaws,
+      splitAt: splitAt,
+      verdict: verdict
+    };
+  }
+
+  /**
+   * Convert an analytic result into a per-number score vector so the
+   * analytic tool can be graded on the same probabilistic scale as the
+   * stochastic tool. A deterministic law puts most of the mass on the
+   * numbers it names but never all of it (guardrail 2).
+   */
+  function analyticScores(draws, config, opts) {
+    var res = opts && opts.result ? opts.result : deriveAnalyticLaw(draws, config, opts);
+    var N = config.poolSize;
+    var w = new Array(N).fill(1);
+    var predicted = [];
+
+    if (res.positionLaws && res.positionLaws.admissible) {
+      predicted = res.positionLaws.prediction;
+    } else if (res.best && res.best.series.indexOf("pos") === 0 && res.best.nextValue != null) {
+      predicted = [res.best.nextValue];
+    }
+
+    var conf = res.positionLaws
+      ? res.positionLaws.meanValAccuracy
+      : res.best
+      ? res.best.valAccuracy
+      : 0;
+    // Confidence is capped: an analytic law is never allowed to claim
+    // certainty about a future observation.
+    var strength = clamp(conf, 0, 0.98) * (opts && opts.strength != null ? opts.strength : 1);
+
+    for (var i = 0; i < predicted.length; i++) {
+      var idx = predicted[i] - config.poolMin;
+      if (idx >= 0 && idx < N) w[idx] = 1 + strength * N;
+    }
+
+    return { weights: w, predicted: predicted, confidence: conf, result: res };
+  }
+
+  /* ====================================================================
+   * 5. TOOL 2 - Statistical / stochastic recurrence model
+   * --------------------------------------------------------------------
+   * Assumes no deterministic law exists. Models recurrence *frequency*
+   * with an exchangeable Beta-Binomial posterior whose prior is centred on
+   * the hypergeometric truth q = k/N (that is the inductive bias), plus an
+   * exponentially weighted channel for non-stationary drift.
+   * ================================================================== */
+
+  var STOCHASTIC_DEFAULTS = {
+    priorStrength: 40, // pseudo-draws of belief in the uniform null
+    decay: 1.0, // 1.0 = stationary; < 1 discounts old draws
+    credibleMass: 0.95
+  };
+
+  function stochasticModel(draws, config, opts) {
+    var o = Object.assign({}, STOCHASTIC_DEFAULTS, opts || {});
+    var s = summarize(draws, config);
+    var N = s.N;
+    var D = s.D;
+    var k = s.k;
+    var q = k / N;
+
+    // Prior: Beta(a0, b0) centred exactly on the hypergeometric rate.
+    var a0 = o.priorStrength * q;
+    var b0 = o.priorStrength * (1 - q);
+
+    // Exponentially weighted counts for the non-stationary channel.
+    var lam = clamp(o.decay, 0.5, 1);
+    var wCounts = new Array(N).fill(0);
+    var wTotal = 0;
+    for (var t = 0; t < D; t++) {
+      var weight = Math.pow(lam, D - 1 - t);
+      wTotal += weight;
+      var nums = draws[t].numbers;
+      for (var j = 0; j < nums.length; j++) wCounts[nums[j] - config.poolMin] += weight;
+    }
+
+    var rows = [];
+    var lo = (1 - o.credibleMass) / 2;
+    var hi = 1 - lo;
+    var sdNull = Math.sqrt(D * q * (1 - q)) || 1;
+
+    for (var i = 0; i < N; i++) {
+      var c = s.counts[i];
+      var a = a0 + c;
+      var b = b0 + (D - c);
+      var post = a / (a + b);
+      var ewma = wTotal > 0 ? (a0 + wCounts[i]) / (a0 + b0 + wTotal) : q;
+      var z = (c - D * q) / sdNull;
+      var pv = twoSidedZP(z);
+      var gapList = s.gaps[i];
+
+      rows.push({
+        index: i,
+        number: label(i, config),
+        count: c,
+        expected: D * q,
+        posteriorMean: post,
+        ci: [betaQuantile(lo, a, b), betaQuantile(hi, a, b)],
+        ewmaMean: ewma,
+        z: z,
+        p: pv,
+        currentGap: s.currentGap[i],
+        meanGap: gapList.length ? mean(gapList) : null,
+        expectedGap: 1 / q,
+        // Under memorylessness the hazard is flat; shown to *refute*
+        // the "due number" fallacy rather than to support it.
+        hazard: q,
+        recurrenceOdds: gapList.length ? mean(gapList) / (1 / q) : null
+      });
+    }
+
+    var fdr = benjaminiHochberg(
+      rows.map(function (r) {
+        return r.p;
+      }),
+      0.05
+    );
+    var survivorSet = new Set(fdr.survivors);
+    rows.forEach(function (r, i) {
+      r.significant = survivorSet.has(i);
+    });
+
+    // Blend the stationary posterior with the non-stationary channel.
+    var blend = lam >= 0.999 ? 0 : clamp((1 - lam) * 8, 0, 0.9);
+    var weights = rows.map(function (r) {
+      return (1 - blend) * r.posteriorMean + blend * r.ewmaMean;
+    });
+    var probs = normalizeToPicks(weights, k);
+    rows.forEach(function (r, i) {
+      r.probability = probs[i];
+      r.lift = probs[i] / q;
+    });
+
+    var ranked = rows.slice().sort(function (a, b) {
+      return b.probability - a.probability;
+    });
+
+    return {
+      rows: rows,
+      ranked: ranked,
+      weights: weights,
+      probabilities: probs,
+      prior: { a0: a0, b0: b0, strength: o.priorStrength, centre: q },
+      decay: lam,
+      blend: blend,
+      effectiveSampleSize: wTotal,
+      significantCount: fdr.survivors.length,
+      fdrThreshold: fdr.threshold,
+      summary: s,
+      shrinkage: o.priorStrength / (o.priorStrength + D)
+    };
+  }
+
+  /** Scale a weight vector so it sums to k (expected hits per draw). */
+  function normalizeToPicks(weights, k) {
+    var tot = sum(weights) || 1;
+    return weights.map(function (w) {
+      return (w / tot) * k;
+    });
+  }
+
+  /* ====================================================================
+   * 6. TOOL 3 - Hybrid model (online expert mixture)
+   * --------------------------------------------------------------------
+   * Neither pure law nor pure noise. Runs the analytic channel and the
+   * stochastic channels as competing experts and learns the mixture
+   * weights online with multiplicative weights (Hedge) under log loss.
+   * The learned weights are themselves the answer: they measure how much
+   * of the series is structure and how much is chance.
+   * ================================================================== */
+
+  var HYBRID_DEFAULTS = {
+    learningRate: 0.5,
+    priorStrength: 40,
+    decay: 0.97,
+    warmup: 0.4
+  };
+
+  function expertPanel(config, opts) {
+    var N = config.poolSize;
+    var k = config.picks;
+    var o = Object.assign({}, HYBRID_DEFAULTS, opts || {});
+
+    return [
+      {
+        id: "uniform",
+        name: "Exchangeable null",
+        note: "Hypergeometric baseline, q = k/N. The regulariser.",
+        score: function () {
+          return new Array(N).fill(k / N);
+        }
+      },
+      {
+        id: "frequency",
+        name: "Shrunk frequency",
+        note: "Beta-Binomial posterior with a prior centred on the null.",
+        score: function (history) {
+          var m = stochasticModel(history, config, {
+            priorStrength: o.priorStrength,
+            decay: 1
+          });
+          return m.probabilities;
+        }
+      },
+      {
+        id: "adaptive",
+        name: "Adaptive (EWMA)",
+        note: "Non-stationary channel; recent draws weighted more heavily.",
+        score: function (history) {
+          var m = stochasticModel(history, config, {
+            priorStrength: o.priorStrength,
+            decay: o.decay
+          });
+          return m.probabilities;
+        }
+      },
+      {
+        id: "analytic",
+        name: "Analytic law",
+        note: "Best out-of-sample-validated recurrence from the restricted class.",
+        score: function (history) {
+          if (history.length < 8) return new Array(N).fill(k / N);
+          var a = analyticScores(history, config, { minValAccuracy: 0.8 });
+          return normalizeToPicks(a.weights, k);
+        }
+      }
+    ];
+  }
+
+  function multiLabelLogLoss(probs, drawNumbers, config) {
+    var k = config.picks;
+    var N = config.poolSize;
+    var floor = 1e-6;
+    var tot = sum(probs) || k;
+    var loss = 0;
+    for (var i = 0; i < drawNumbers.length; i++) {
+      var idx = drawNumbers[i] - config.poolMin;
+      var pi = clamp((probs[idx] || 0) / tot, floor, 1);
+      loss -= Math.log(pi);
+    }
+    return { loss: loss / drawNumbers.length, baseline: Math.log(N) };
+  }
+
+  function hybridModel(draws, config, opts) {
+    var o = Object.assign({}, HYBRID_DEFAULTS, opts || {});
+    var experts = expertPanel(config, o);
+    var M = experts.length;
+    var w = new Array(M).fill(1 / M);
+    var eta = o.learningRate;
+    var start = Math.max(6, Math.floor(draws.length * o.warmup));
+    var trajectory = [];
+    var cumulative = new Array(M).fill(0);
+    var rounds = 0;
+    var N = config.poolSize;
+    // Prequential record: at every step we store the mixture's prediction
+    // made *before* seeing draw t. That is a genuine out-of-sample forecast,
+    // so an online learner can be evaluated honestly in a single pass.
+    var prequential = [];
+
+    // Every round refits all experts on the growing history, so an
+    // unbounded sweep is quadratic. Cap the number of update rounds; each
+    // retained round is still predict-then-update on data the experts have
+    // not seen, which is what makes the learned weights meaningful.
+    var maxRounds = o.maxRounds == null ? 150 : o.maxRounds;
+    var stride = Math.max(1, Math.ceil((draws.length - start) / maxRounds));
+
+    for (var t = start; t < draws.length; t += stride) {
+      var history = draws.slice(0, t);
+      var scores = experts.map(function (e) {
+        return e.score(history);
+      });
+
+      // Mixture forecast using the weights available before this outcome.
+      var pre = new Array(N).fill(0);
+      for (var pi = 0; pi < N; pi++) {
+        for (var pj = 0; pj < M; pj++) pre[pi] += w[pj] * scores[pj][pi];
+      }
+      prequential.push({ t: t, probs: normalizeToPicks(pre, config.picks) });
+
+      var losses = scores.map(function (s) {
+        return multiLabelLogLoss(s, draws[t].numbers, config).loss;
+      });
+      var minLoss = Math.min.apply(null, losses);
+      for (var m = 0; m < M; m++) {
+        cumulative[m] += losses[m];
+        w[m] *= Math.exp(-eta * (losses[m] - minLoss));
+      }
+      var tot = sum(w) || 1;
+      for (var n = 0; n < M; n++) w[n] /= tot;
+      trajectory.push({ t: t, weights: w.slice(), losses: losses });
+      rounds++;
+    }
+
+    // Final blended prediction over the full history.
+    var finalScores = experts.map(function (e) {
+      return e.score(draws);
+    });
+    var N = config.poolSize;
+    var blended = new Array(N).fill(0);
+    for (var i = 0; i < N; i++) {
+      for (var j = 0; j < M; j++) blended[i] += w[j] * finalScores[j][i];
+    }
+    var probs = normalizeToPicks(blended, config.picks);
+
+    var rows = probs.map(function (p, idx) {
+      return {
+        index: idx,
+        number: label(idx, config),
+        probability: p,
+        lift: p / (config.picks / N),
+        contributions: experts.map(function (e, j) {
+          return { id: e.id, value: w[j] * finalScores[j][idx] };
+        })
+      };
+    });
+
+    return {
+      experts: experts.map(function (e, j) {
+        return {
+          id: e.id,
+          name: e.name,
+          note: e.note,
+          weight: w[j],
+          meanLoss: rounds ? cumulative[j] / rounds : null
+        };
+      }),
+      weights: w,
+      trajectory: trajectory,
+      prequential: prequential,
+      rounds: rounds,
+      probabilities: probs,
+      rows: rows,
+      ranked: rows.slice().sort(function (a, b) {
+        return b.probability - a.probability;
+      }),
+      structureShare: w[3],
+      noiseShare: w[0] + w[1] + w[2]
+    };
+  }
+
+  /* ====================================================================
+   * 7. Walk-forward validation - the only judge that counts
+   * --------------------------------------------------------------------
+   * "A model should be judged by its ability to predict new observations,
+   *  not by its ability to reproduce old ones."
+   * Every tool is refit from scratch at each step on strictly past data.
+   * ================================================================== */
+
+  function backtest(draws, config, scorer, opts) {
+    opts = opts || {};
+    var startFrac = opts.startFraction == null ? 0.5 : opts.startFraction;
+    var start = Math.max(6, Math.floor(draws.length * startFrac));
+    var N = config.poolSize;
+    var k = config.picks;
+    var q = k / N;
+
+    if (draws.length - start < 3) {
+      return { testable: false, reason: "Need more draws to hold out a fair test window." };
+    }
+
+    // Each step refits from scratch, so a full sweep is quadratic. Above a
+    // few hundred draws we stride through the test window instead. Every
+    // retained step is still a genuine refit-and-predict on unseen data, so
+    // this trades resolution for responsiveness, not validity.
+    var maxSteps = opts.maxSteps == null ? 150 : opts.maxSteps;
+    var stride = Math.max(1, Math.ceil((draws.length - start) / maxSteps));
+
+    var losses = [];
+    var briers = [];
+    var hits = [];
+    var topKHits = [];
+    var calibration = [];
+    for (var c = 0; c < 10; c++) calibration.push({ n: 0, predicted: 0, observed: 0 });
+
+    for (var t = start; t < draws.length; t += stride) {
+      var history = draws.slice(0, t);
+      var probs;
+      try {
+        probs = scorer(history);
+      } catch (e) {
+        continue;
+      }
+      var actual = new Set(
+        draws[t].numbers.map(function (x) {
+          return x - config.poolMin;
+        })
+      );
+
+      var ll = multiLabelLogLoss(probs, draws[t].numbers, config);
+      losses.push(ll.loss);
+
+      var brier = 0;
+      for (var i = 0; i < N; i++) {
+        var y = actual.has(i) ? 1 : 0;
+        var p = clamp(probs[i], 0, 1);
+        brier += (p - y) * (p - y);
+        var bin = clamp(Math.floor((p / (2 * q)) * 10), 0, 9);
+        calibration[bin].n++;
+        calibration[bin].predicted += p;
+        calibration[bin].observed += y;
+      }
+      briers.push(brier / N);
+
+      var order = range(N).sort(function (a, b) {
+        return probs[b] - probs[a];
+      });
+      var top = order.slice(0, k);
+      var hit = top.filter(function (i) {
+        return actual.has(i);
+      }).length;
+      topKHits.push(hit);
+      hits.push(hit / k);
+    }
+
+    var n = losses.length;
+    var meanLoss = mean(losses);
+    var baseline = Math.log(N);
+    var lift = (baseline - meanLoss) / baseline;
+    var meanHits = mean(topKHits);
+    var chanceHits = (k * k) / N;
+
+    // Is the top-k hit rate distinguishable from chance? Under the null the
+    // overlap between a fixed top-k set and the drawn k is hypergeometric,
+    // so include the finite-population correction.
+    var fpc = N > 1 ? (N - k) / (N - 1) : 1;
+    var hitVar = k * q * (1 - q) * fpc;
+    var hitSd = n > 0 ? Math.sqrt(hitVar / n) : 0;
+    var hitZ = hitSd > 0 ? (meanHits - chanceHits) / hitSd : 0;
+    var hitP = twoSidedZP(hitZ);
+
+    // Paired test of log loss against the uniform baseline.
+    var diffs = losses.map(function (l) {
+      return baseline - l;
+    });
+    var dSd = Math.sqrt(variance(diffs) / (n || 1));
+    var dZ = dSd > 0 ? mean(diffs) / dSd : 0;
+    var dP = twoSidedZP(dZ);
+
+    return {
+      testable: true,
+      n: n,
+      start: start,
+      stride: stride,
+      meanLogLoss: meanLoss,
+      baselineLogLoss: baseline,
+      lift: lift,
+      logLossZ: dZ,
+      logLossP: dP,
+      meanBrier: mean(briers),
+      baselineBrier: q * (1 - q),
+      meanTopKHits: meanHits,
+      chanceHits: chanceHits,
+      hitZ: hitZ,
+      hitP: hitP,
+      hitSeries: topKHits,
+      lossSeries: losses,
+      calibration: calibration.map(function (b) {
+        return {
+          n: b.n,
+          predicted: b.n ? b.predicted / b.n : 0,
+          observed: b.n ? b.observed / b.n : 0
+        };
+      }),
+      // Either test may detect an edge: log loss is sensitive to the whole
+      // probability vector, the hit test to the ranking at the top. Two
+      // tests are run, so each is held to a Bonferroni-corrected 0.025 to
+      // keep the overall false-positive rate near 5%.
+      beatsChance:
+        (dP < 0.025 && mean(diffs) > 0) || (hitP < 0.025 && meanHits > chanceHits),
+      evidence: {
+        logLoss: dP < 0.025 && mean(diffs) > 0,
+        topK: hitP < 0.025 && meanHits > chanceHits,
+        alpha: 0.025
+      }
+    };
+  }
+
+  /**
+   * Evaluate a set of pre-recorded out-of-sample forecasts.
+   * Shares all scoring logic with backtest(), but consumes forecasts that
+   * were already produced online (one pass) instead of refitting per step.
+   */
+  function evaluateForecasts(forecasts, draws, config) {
+    if (!forecasts || forecasts.length < 3) {
+      return { testable: false, reason: "Need more draws to hold out a fair test window." };
+    }
+    // Index the recorded forecasts by the draw index they predicted.
+    var byT = {};
+    for (var i = 0; i < forecasts.length; i++) byT[forecasts[i].t] = forecasts[i].probs;
+    var startT = forecasts[0].t;
+    return backtest(draws, config, function (history) {
+      return byT[history.length] || new Array(config.poolSize).fill(config.picks / config.poolSize);
+    }, { startFraction: startT / draws.length });
+  }
+
+  function scorerFor(tool, config, opts) {
+    opts = opts || {};
+    var k = config.picks;
+    if (tool === "analytic") {
+      return function (history) {
+        var a = analyticScores(history, config, {
+          minValAccuracy: opts.minValAccuracy == null ? 0.85 : opts.minValAccuracy
+        });
+        return normalizeToPicks(a.weights, k);
+      };
+    }
+    if (tool === "stochastic") {
+      return function (history) {
+        return stochasticModel(history, config, opts).probabilities;
+      };
+    }
+    return function (history) {
+      if (history.length < 12) return new Array(config.poolSize).fill(k / config.poolSize);
+      return hybridModel(history, config, opts).probabilities;
+    };
+  }
+
+  /* ====================================================================
+   * 7b. Structure & randomness battery (ported from the prototype)
+   * --------------------------------------------------------------------
+   * Additional, independent evidence about *how random* the series is.
+   * These operate on the observed history only. They never predict a next
+   * draw; they strengthen or weaken the case that any structure exists at
+   * all. Ported from the earlier numbers_predictions prototype (runs test,
+   * Kolmogorov-Smirnov vs uniform, Poisson recurrence model, and FFT
+   * spectral concentration), re-derived here against the real config.
+   * ================================================================== */
+
+  /**
+   * Wald-Wolfowitz runs test on the draw sums (above/below median).
+   * Detects serial dependence / clustering that per-number tests miss.
+   */
+  function runsTest(values) {
+    if (!values || values.length < 10) return { testable: false, reason: "Need at least 10 draws." };
+    var sorted = values.slice().sort(function (a, b) { return a - b; });
+    var median = sorted[Math.floor(sorted.length / 2)];
+    var binary = values.map(function (v) { return v > median ? 1 : 0; });
+    var runs = 1;
+    for (var i = 1; i < binary.length; i++) if (binary[i] !== binary[i - 1]) runs++;
+    var n1 = binary.filter(function (b) { return b === 1; }).length;
+    var n0 = binary.length - n1;
+    if (n1 === 0 || n0 === 0) return { testable: false, reason: "All values on one side of the median." };
+    var expR = (2 * n1 * n0) / (n1 + n0) + 1;
+    var varR = (2 * n1 * n0 * (2 * n1 * n0 - n1 - n0)) / (Math.pow(n1 + n0, 2) * (n1 + n0 - 1));
+    var z = varR > 0 ? (runs - expR) / Math.sqrt(varR) : 0;
+    return { testable: true, runs: runs, expected: expR, z: z, p: twoSidedZP(z) };
+  }
+
+  /**
+   * Kolmogorov-Smirnov test of the flattened observed values against the
+   * discrete uniform over the pool. The observed values are bounded integers,
+   * so ties are dense and the classical asymptotic p-value is badly
+   * anti-conservative here. We therefore calibrate the exact D statistic
+   * against its own permutation null (uniform draws of the same size), which
+   * is the honest reference for discrete data.
+   */
+  function ksTestUniform(values, config) {
+    if (!values || values.length < 10) return { testable: false, reason: "Need at least 10 values." };
+    var lo = config.poolMin;
+    var N = config.poolSize;
+    var n = values.length;
+
+    function ksStat(arr) {
+      var sorted = arr.slice().sort(function (a, b) { return a - b; });
+      var d = 0;
+      for (var i = 0; i < sorted.length; i++) {
+        var empirical = (i + 1) / sorted.length;
+        var theo = clamp((sorted[i] - lo + 1) / N, 0, 1);
+        var theoPrev = clamp((sorted[i] - lo) / N, 0, 1);
+        d = Math.max(d, Math.abs(empirical - theo), Math.abs(empirical - theoPrev));
+      }
+      return d;
+    }
+
+    var d = ksStat(values);
+
+    // Permutation null: draw n independent uniforms from the pool and record
+    // how often their KS statistic meets or exceeds the observed one.
+    var sims = 400;
+    var rand = mulberry32(0x9e3779b9 ^ n);
+    var ge = 0;
+    for (var s = 0; s < sims; s++) {
+      var synth = new Array(n);
+      for (var i = 0; i < n; i++) synth[i] = lo + Math.floor(rand() * N);
+      if (ksStat(synth) >= d - 1e-12) ge++;
+    }
+    var p = clamp((ge + 1) / (sims + 1), 0, 1);
+    return { testable: true, stat: d, p: p, n: n, calibration: "permutation (" + sims + " sims)" };
+  }
+
+  /**
+   * Poisson model for the number of times a single number recurs across D
+   * draws. Returns the expected count and the probability of seeing count c
+   * or more extreme than c, used to sanity-check the "overdue/hot" intuition.
+   */
+  function poissonRecurrence(draws, config) {
+    var s = summarize(draws, config);
+    var q = config.picks / config.poolSize;
+    var lam = draws.length * q; // expected hits per number
+    // For each number, P(X >= count) under Poisson(lam), and the most extreme.
+    var rows = s.counts.map(function (c, i) {
+      // P(X >= c) = 1 - P(X <= c-1); compute lower tail directly.
+      var cum = 0;
+      var term = Math.exp(-lam);
+      for (var x = 0; x < c; x++) {
+        cum += term;
+        term *= lam / (x + 1);
+      }
+      var pGe = clamp(1 - cum, 0, 1);
+      return { number: label(i, config), count: c, expected: lam, pGe: pGe };
+    });
+    rows.sort(function (a, b) { return a.pGe - b.pGe; });
+    return {
+      lambda: lam,
+      draws: draws.length,
+      q: q,
+      mostExtreme: rows.slice(0, 5),
+      // Smallest P(X>=c) across the pool; with N numbers a Bonferroni floor
+      // of 0.05/N is the honest significance line.
+      bonferroni: 0.05 / config.poolSize
+    };
+  }
+
+  /**
+   * FFT spectral concentration of the draw-sum series. A single dominant
+   * frequency is weak evidence of periodicity; a flat spectrum is what pure
+   * noise produces. Returns the dominant peak's share of total energy.
+   */
+  function spectralConcentration(values) {
+    if (!values || values.length < 8) return { testable: false, reason: "Need at least 8 draws." };
+    var n = values.length;
+    // Next power of two for a clean radix-2 FFT.
+    var size = 1;
+    while (size < n) size <<= 1;
+    var re = new Array(size).fill(0);
+    var im = new Array(size).fill(0);
+    var m = mean(values);
+    for (var i = 0; i < n; i++) re[i] = values[i] - m;
+    fft(re, im);
+    var half = size / 2;
+    var mags = [];
+    for (var j = 1; j < half; j++) mags.push({ bin: j, mag: Math.hypot(re[j], im[j]) });
+    var total = sum(mags.map(function (x) { return x.mag * x.mag; }));
+    mags.sort(function (a, b) { return b.mag - a.mag; });
+    var top = mags.slice(0, 3);
+    var topEnergy = sum(top.map(function (x) { return x.mag * x.mag; }));
+    return {
+      testable: true,
+      dominantPeriod: top.length ? size / top[0].bin : null,
+      concentration: total > 0 ? topEnergy / total : 0,
+      topPeaks: top.map(function (x) { return { period: size / x.bin, energyShare: total > 0 ? (x.mag * x.mag) / total : 0 }; })
+    };
+  }
+
+  // In-place radix-2 iterative FFT.
+  function fft(re, im) {
+    var n = re.length;
+    for (var i = 1, j = 0; i < n; i++) {
+      var bit = n >> 1;
+      for (; j & bit; bit >>= 1) j ^= bit;
+      j ^= bit;
+      if (i < j) {
+        var tr = re[i]; re[i] = re[j]; re[j] = tr;
+        var ti = im[i]; im[i] = im[j]; im[j] = ti;
+      }
+    }
+    for (var len = 2; len <= n; len <<= 1) {
+      var ang = (-2 * Math.PI) / len;
+      var wr = Math.cos(ang);
+      var wi = Math.sin(ang);
+      for (var i2 = 0; i2 < n; i2 += len) {
+        var cwr = 1;
+        var cwi = 0;
+        for (var j2 = 0; j2 < len / 2; j2++) {
+          var ur = re[i2 + j2];
+          var ui = im[i2 + j2];
+          var vr = re[i2 + j2 + len / 2] * cwr - im[i2 + j2 + len / 2] * cwi;
+          var vi = re[i2 + j2 + len / 2] * cwi + im[i2 + j2 + len / 2] * cwr;
+          re[i2 + j2] = ur + vr;
+          im[i2 + j2] = ui + vi;
+          re[i2 + j2 + len / 2] = ur - vr;
+          im[i2 + j2 + len / 2] = ui - vi;
+          var nwr = cwr * wr - cwi * wi;
+          cwi = cwr * wi + cwi * wr;
+          cwr = nwr;
+        }
+      }
+    }
+  }
+
+  /**
+   * Run the full ported battery against a parsed history and return a
+   * consolidated structure-evidence report for the UI.
+   */
+  function structureTests(draws, config) {
+    var s = summarize(draws, config);
+    var flat = [];
+    draws.forEach(function (d) {
+      d.numbers.forEach(function (x) { flat.push(x); });
+    });
+    return {
+      runs: runsTest(s.sums),
+      ks: ksTestUniform(flat, config),
+      poisson: poissonRecurrence(draws, config),
+      spectral: spectralConcentration(s.sums)
+    };
+  }
+
+  /* ====================================================================
+   * 8. Sample generators - reproducible corpora for each regime
+   * ================================================================== */
+
+  function drawWithoutReplacement(rand, weights, k) {
+    var pool = weights.slice();
+    var picked = [];
+    for (var i = 0; i < k; i++) {
+      var tot = sum(pool);
+      if (tot <= 0) break;
+      var r = rand() * tot;
+      var acc = 0;
+      for (var j = 0; j < pool.length; j++) {
+        acc += pool[j];
+        if (r <= acc) {
+          picked.push(j);
+          pool[j] = 0;
+          break;
+        }
+      }
+    }
+    return picked;
+  }
+
+  var SAMPLES = {
+    random: {
+      id: "random",
+      name: "Pure chance (6/49)",
+      blurb: "120 genuinely independent draws. The honest answer is 'no pattern'.",
+      config: { poolMin: 1, poolMax: 49, picks: 6 },
+      generate: function (cfg, n, seed) {
+        var rand = mulberry32(seed || 20260729);
+        var out = [];
+        for (var t = 0; t < n; t++) {
+          var w = new Array(cfg.poolSize).fill(1);
+          out.push(drawWithoutReplacement(rand, w, cfg.picks));
+        }
+        return out;
+      }
+    },
+    law: {
+      id: "law",
+      name: "Deterministic law (5/40)",
+      blurb: "Each ascending position follows an affine recurrence mod 41.",
+      config: { poolMin: 1, poolMax: 40, picks: 5 },
+      generate: function (cfg, n) {
+        var out = [];
+        var state = [3, 11, 19, 27, 35];
+        for (var t = 0; t < n; t++) {
+          out.push(
+            state
+              .map(function (x) {
+                return x - 1;
+              })
+              .slice()
+              .sort(function (a, b) {
+                return a - b;
+              })
+          );
+          state = state.map(function (x, i) {
+            var v = mod(3 * x + (7 + i), 41);
+            return v === 0 ? 1 : v;
+          });
+          // Keep the draw admissible (distinct values in range).
+          var seen = new Set();
+          state = state.map(function (v) {
+            while (seen.has(v)) v = mod(v + 1, 41) || 1;
+            seen.add(v);
+            return v;
+          });
+        }
+        return out;
+      }
+    },
+    mixed: {
+      id: "mixed",
+      name: "Biased mechanism (6/49)",
+      blurb: "Chance plus a persistent physical bias on a subset of the pool.",
+      config: { poolMin: 1, poolMax: 49, picks: 6 },
+      generate: function (cfg, n, seed) {
+        var rand = mulberry32(seed || 424242);
+        var biased = [7, 11, 23, 31, 42];
+        var out = [];
+        for (var t = 0; t < n; t++) {
+          var w = new Array(cfg.poolSize).fill(1);
+          // Slow drift: the bias strengthens over time (non-stationary).
+          var strength = 1.4 + 1.6 * (t / n);
+          for (var b = 0; b < biased.length; b++) w[biased[b] - 1] = strength;
+          out.push(drawWithoutReplacement(rand, w, cfg.picks));
+        }
+        return out;
+      }
+    },
+    drift: {
+      id: "drift",
+      name: "Regime shift (5/35)",
+      blurb: "Stationary for 60 draws, then the mechanism changes.",
+      config: { poolMin: 1, poolMax: 35, picks: 5 },
+      generate: function (cfg, n, seed) {
+        var rand = mulberry32(seed || 99991);
+        var out = [];
+        for (var t = 0; t < n; t++) {
+          var w = new Array(cfg.poolSize).fill(1);
+          if (t > n * 0.5) {
+            for (var i = 0; i < 8; i++) w[i] = 3.2;
+          }
+          out.push(drawWithoutReplacement(rand, w, cfg.picks));
+        }
+        return out;
+      }
+    }
+  };
+
+  function generateSample(id, n, seed) {
+    var spec = SAMPLES[id] || SAMPLES.random;
+    var cfg = normalizeConfig(spec.config);
+    var rows = spec.generate(cfg, n || 120, seed);
+    var lines = rows.map(function (r, i) {
+      var nums = r
+        .map(function (x) {
+          return x + cfg.poolMin;
+        })
+        .sort(function (a, b) {
+          return a - b;
+        });
+      return isoDate(i, rows.length) + "  " + nums.join("  ");
+    });
+    return { id: spec.id, name: spec.name, blurb: spec.blurb, config: cfg, text: lines.join("\n") };
+  }
+
+  function isoDate(i, total) {
+    var base = Date.UTC(2026, 6, 29) - (total - 1 - i) * 3.5 * 86400000;
+    return new Date(base).toISOString().slice(0, 10);
+  }
+
+  /* ====================================================================
+   * 9. Monte Carlo simulator
+   * --------------------------------------------------------------------
+   * Two complementary simulation views, both framed probabilistically:
+   *   - monteCarloEnvelope: what does *chance* produce? Replicate the null
+   *     experiment R times and read the 95% envelope around the expected
+   *     count for each number, then lay the observed counts over it.
+   *   - predictionMonteCarlo: what does the *fitted model* expect next?
+   *     Sample R next-draws from the model's probability vector, read the
+   *     predicted rate per number against the null line, and report the
+   *     modal next set together with how likely any exact set is.
+   * Neither claims a certain outcome; the prediction is a distribution.
+   * ================================================================== */
+
+  /**
+   * Replicate the null (sampling without replacement, D draws of k from N)
+   * R times and build a Monte Carlo envelope around the expected count for
+   * each number. The observed per-number counts are then compared against
+   * the envelope: a number outside it deviates from chance at roughly the
+   * stated level (with the usual multiplicity caveat across N numbers).
+   */
+  function monteCarloEnvelope(draws, config, opts) {
+    var o = Object.assign({ replicates: 1000, level: 0.95, seed: 20260731 }, opts || {});
+    var s = summarize(draws, config);
+    var N = config.poolSize;
+    var k = config.picks;
+    var D = draws.length;
+    var rand = mulberry32(o.seed >>> 0);
+
+    var counts = [];
+    for (var i = 0; i < N; i++) counts.push([]);
+    for (var r = 0; r < o.replicates; r++) {
+      var w = new Array(N).fill(1);
+      for (var d = 0; d < D; d++) {
+        var picked = drawWithoutReplacement(rand, w, k);
+        for (var p = 0; p < picked.length; p++) counts[picked[p]][r] =
+          (counts[picked[p]][r] || 0) + 1;
+      }
+    }
+
+    var loQ = (1 - o.level) / 2;
+    var hiQ = 1 - loQ;
+    var rows = [];
+    for (var n = 0; n < N; n++) {
+      var arr = counts[n].map(function (x) { return x || 0; }).sort(function (a, b) { return a - b; });
+      var lo = arr[Math.floor(loQ * arr.length)] != null ? arr[Math.floor(loQ * arr.length)] : 0;
+      var hi = arr[Math.ceil(hiQ * arr.length) - 1] != null ? arr[Math.ceil(hiQ * arr.length) - 1] : 0;
+      var meanSim = mean(arr);
+      rows.push({
+        number: label(n, config),
+        observed: s.counts[n],
+        expected: s.expectedCount,
+        mcMean: meanSim,
+        envelopeLo: lo,
+        envelopeHi: hi,
+        outside: s.counts[n] < lo || s.counts[n] > hi
+      });
+    }
+
+    var outsideCount = rows.filter(function (x) { return x.outside; }).length;
+    var expectedOutside = N * (1 - o.level);
+    return {
+      rows: rows,
+      draws: D,
+      replicates: o.replicates,
+      level: o.level,
+      expectedCount: s.expectedCount,
+      outsideCount: outsideCount,
+      expectedOutside: expectedOutside,
+      // A fair mechanism still throws a few numbers outside a 95% envelope;
+      // alarm is warranted only well beyond that chance rate.
+      interpretation: outsideCount <= Math.ceil(expectedOutside * 2)
+        ? "within the range chance produces"
+        : "more numbers outside the envelope than chance explains"
+    };
+  }
+
+  /**
+   * Monte Carlo next-draw simulator for a fitted model. Draws R next-draws
+   * from the model's per-number probability vector (any of the three tools),
+   * then reads (a) the predicted appearance rate per number against the null,
+   * and (b) the modal predicted set with its exact-set probability, compared
+   * to the null's 1 / C(N, k). Always framed as a distribution, not a pick.
+   */
+  function predictionMonteCarlo(probabilities, config, opts) {
+    var o = Object.assign({ replicates: 4000, topSet: true, seed: 20260731 }, opts || {});
+    var N = config.poolSize;
+    var k = config.picks;
+    var q = k / N;
+    var rand = mulberry32(o.seed >>> 0);
+
+    // Normalize the model vector to a proper sampling distribution.
+    var tot = sum(probabilities) || k;
+    var w = probabilities.map(function (p) { return Math.max(0, p / tot); });
+
+    var hits = new Array(N).fill(0);
+    var setCounts = {};
+    for (var r = 0; r < o.replicates; r++) {
+      var picked = drawWithoutReplacement(rand, w.slice(), k);
+      var key = null;
+      var arr = [];
+      for (var p = 0; p < picked.length; p++) {
+        hits[picked[p]]++;
+        arr.push(picked[p]);
+      }
+      if (o.topSet && arr.length === k) {
+        arr.sort(function (a, b) { return a - b; });
+        key = arr.join(",");
+        setCounts[key] = (setCounts[key] || 0) + 1;
+      }
+    }
+
+    var rows = hits.map(function (h, i) {
+      var rate = h / o.replicates;
+      return {
+        number: label(i, config),
+        predictedRate: rate,
+        nullRate: q,
+        lift: q > 0 ? rate / q : 1
+      };
+    });
+
+    // Modal set and its exact probability.
+    var bestKey = null;
+    var bestCount = 0;
+    Object.keys(setCounts).forEach(function (key) {
+      if (setCounts[key] > bestCount) { bestCount = setCounts[key]; bestKey = key; }
+    });
+    var modalSet = bestKey ? bestKey.split(",").map(function (x) { return label(Number(x), config); }) : [];
+    var modalSetProb = bestCount / o.replicates;
+
+    // Null exact-set probability: 1 / C(N, k).
+    var logComb = logGamma(N + 1) - logGamma(k + 1) - logGamma(N - k + 1);
+    var nullSetProb = Math.exp(-logComb);
+
+    return {
+      rows: rows,
+      replicates: o.replicates,
+      modalSet: modalSet,
+      modalSetProb: modalSetProb,
+      nullSetProb: nullSetProb,
+      totalSets: Math.exp(logComb),
+      // How much more likely the model's modal set is than a random set.
+      concentration: nullSetProb > 0 ? modalSetProb / nullSetProb : 1,
+      // Where the model's probability actually concentrates (top-k numbers).
+      topNumbers: rows.slice().sort(function (a, b) { return b.predictedRate - a.predictedRate; }).slice(0, k)
+    };
+  }
+
+  /* ====================================================================
+   * 10. Public surface
+   * ================================================================== */
+
+  return {
+    DEFAULT_CONFIG: DEFAULT_CONFIG,
+    STOCHASTIC_DEFAULTS: STOCHASTIC_DEFAULTS,
+    HYBRID_DEFAULTS: HYBRID_DEFAULTS,
+    SAMPLES: SAMPLES,
+    normalizeConfig: normalizeConfig,
+    parseDraws: parseDraws,
+    autoDetectConfig: autoDetectConfig,
+    summarize: summarize,
+    diagnostics: diagnostics,
+    deriveAnalyticLaw: deriveAnalyticLaw,
+    analyticScores: analyticScores,
+    stochasticModel: stochasticModel,
+    hybridModel: hybridModel,
+    backtest: backtest,
+    evaluateForecasts: evaluateForecasts,
+    scorerFor: scorerFor,
+    structureTests: structureTests,
+    monteCarloEnvelope: monteCarloEnvelope,
+    predictionMonteCarlo: predictionMonteCarlo,
+    generateSample: generateSample,
+    normalizeToPicks: normalizeToPicks,
+    multiLabelLogLoss: multiLabelLogLoss,
+    stats: {
+      chiSquareP: chiSquareP,
+      twoSidedZP: twoSidedZP,
+      normalCdf: normalCdf,
+      betaQuantile: betaQuantile,
+      incompleteBeta: incompleteBeta,
+      benjaminiHochberg: benjaminiHochberg,
+      logGamma: logGamma,
+      mean: mean,
+      variance: variance,
+      autocorr: autocorr,
+      mulberry32: mulberry32
+    }
+  };
+});
+
+</script>
+    <script>
+/*
+ * Recurrence Lab — UI controller
+ * Renders three interchangeable tools over RecurrenceEngine.
+ */
+(function () {
+  "use strict";
+
+  var E = window.RecurrenceEngine;
+  var STORAGE_KEY = "recurrence-lab:v1";
+
+  var state = {
+    tool: "analytic",
+    parsed: null,
+    diag: null,
+    results: {},
+    config: E.normalizeConfig({}),
+    stochasticOpts: { priorStrength: 40, decay: 1.0 },
+    mcSeed: 20260731,
+    running: false
+  };
+
+  var el = {};
+
+  function $(id) {
+    return document.getElementById(id);
+  }
+
+  function ready() {
+    el.input = $("dataInput");
+    el.parseStatus = $("parseStatus");
+    el.detectHint = $("detectHint");
+    el.verdictHost = $("verdictHost");
+    el.toolSection = $("toolSection");
+    el.panels = {
+      analytic: $("panel-analytic"),
+      stochastic: $("panel-stochastic"),
+      hybrid: $("panel-hybrid")
+    };
+    el.cfg = {
+      min: $("cfgMin"),
+      max: $("cfgMax"),
+      picks: $("cfgPicks"),
+      replace: $("cfgReplace")
+    };
+
+    el.input.addEventListener("input", onInput);
+    $("btnAnalyze").addEventListener("click", runAnalysis);
+    $("btnClear").addEventListener("click", function () {
+      el.input.value = "";
+      onInput();
+      reset();
+    });
+    $("btnUpload").addEventListener("click", function () {
+      $("fileInput").click();
+    });
+    $("fileInput").addEventListener("change", onFile);
+    $("btnExport").addEventListener("click", exportReport);
+    $("btnMethod").addEventListener("click", function () {
+      var c = $("methodCard");
+      c.hidden = !c.hidden;
+      if (!c.hidden && c.scrollIntoView) c.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    $("btnMethodClose").addEventListener("click", function () {
+      $("methodCard").hidden = true;
+    });
+
+    Array.prototype.forEach.call(document.querySelectorAll("[data-sample]"), function (b) {
+      b.addEventListener("click", function () {
+        loadSample(b.getAttribute("data-sample"));
+      });
+    });
+
+    Array.prototype.forEach.call(document.querySelectorAll(".tool-tab"), function (t) {
+      t.addEventListener("click", function () {
+        selectTool(t.getAttribute("data-tool"));
+      });
+    });
+
+    Object.keys(el.cfg).forEach(function (k) {
+      el.cfg[k].addEventListener("change", function () {
+        readConfig();
+        onInput();
+      });
+    });
+
+    restore();
+    onInput();
+  }
+
+  function readConfig() {
+    state.config = E.normalizeConfig({
+      poolMin: Number(el.cfg.min.value),
+      poolMax: Number(el.cfg.max.value),
+      picks: Number(el.cfg.picks.value)
+    });
+    state.withReplacement = el.cfg.replace.value === "with";
+    $("priorNote").innerHTML =
+      "Null hypothesis: every number equally likely, q = k/N = " +
+      state.config.picks +
+      "/" +
+      state.config.poolSize +
+      " = <strong>" +
+      (state.config.picks / state.config.poolSize).toFixed(4) +
+      "</strong> per draw.";
+    return state.config;
+  }
+
+  function writeConfig(cfg) {
+    el.cfg.min.value = cfg.poolMin;
+    el.cfg.max.value = cfg.poolMax;
+    el.cfg.picks.value = cfg.picks;
+    readConfig();
+  }
+
+  /* ---------------- intake ---------------- */
+
+  function onInput() {
+    var text = el.input.value;
+    if (!text.trim()) {
+      el.parseStatus.className = "parse-status";
+      el.parseStatus.textContent = "Waiting for observations.";
+      el.detectHint.textContent = "";
+      $("btnAnalyze").disabled = true;
+      return;
+    }
+    readConfig();
+    var parsed = E.parseDraws(text, state.config);
+    var detected = E.autoDetectConfig(text);
+
+    // If the current structure rejects everything but the data clearly has a
+    // consistent shape of its own, adopt it rather than showing a wall of
+    // errors the user has to decode.
+    if (!parsed.draws.length && detected && parsed.total > 0) {
+      var trial = E.parseDraws(text, detected);
+      if (trial.draws.length) {
+        writeConfig(detected);
+        parsed = trial;
+        el.detectHint.innerHTML =
+          "Structure auto-set to <strong>" + detected.picks + "/" + detected.poolMax + "</strong> to match your data.";
+      }
+    }
+    state.parsed = parsed;
+    if (
+      detected &&
+      (detected.picks !== state.config.picks || detected.poolMax !== state.config.poolMax)
+    ) {
+      el.detectHint.innerHTML =
+        'Looks like <strong>' + detected.picks + "/" + detected.poolMax +
+        '</strong>. <a href="#" id="applyDetect">Apply</a>';
+      var a = $("applyDetect");
+      if (a) {
+        a.addEventListener("click", function (ev) {
+          ev.preventDefault();
+          writeConfig(detected);
+          onInput();
+        });
+      }
+    } else {
+      el.detectHint.textContent = detected ? "Structure matches your settings." : "";
+    }
+
+    var n = parsed.draws.length;
+    var cls = "parse-status is-ok";
+    var msg = "<strong>" + n + " valid draws</strong> parsed.";
+    if (!n) {
+      cls = "parse-status is-bad";
+      msg = "<strong>No valid draws.</strong> Check the pool range and picks per draw.";
+    } else if (n < 12) {
+      cls = "parse-status is-warn";
+      msg +=
+        " Fewer than 12 draws is too little to separate signal from noise; results will be" +
+        " dominated by the prior.";
+    }
+    if (parsed.rejected.length) {
+      cls = n ? "parse-status is-warn" : cls;
+      msg +=
+        " <strong>" + parsed.rejected.length + " rejected.</strong>" +
+        "<ul>" +
+        parsed.issues.slice(0, 5).map(function (i) { return "<li>" + esc(i) + "</li>"; }).join("") +
+        (parsed.issues.length > 5 ? "<li>and " + (parsed.issues.length - 5) + " more</li>" : "") +
+        "</ul>";
+    }
+    el.parseStatus.className = cls;
+    el.parseStatus.innerHTML = msg;
+    $("btnAnalyze").disabled = n < 4;
+    persist();
+  }
+
+  function onFile(ev) {
+    var f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    var r = new FileReader();
+    r.onload = function () {
+      el.input.value = String(r.result);
+      var d = E.autoDetectConfig(el.input.value);
+      if (d) writeConfig(d);
+      onInput();
+    };
+    r.readAsText(f);
+    ev.target.value = "";
+  }
+
+  function loadSample(id) {
+    var s = E.generateSample(id, 120);
+    el.input.value = s.text;
+    writeConfig(s.config);
+    onInput();
+    runAnalysis();
+  }
+
+  function reset() {
+    state.diag = null;
+    state.results = {};
+    el.verdictHost.hidden = true;
+    el.toolSection.hidden = true;
+    Object.keys(el.panels).forEach(function (k) {
+      el.panels[k].hidden = true;
+      el.panels[k].innerHTML = "";
+    });
+    $("btnExport").disabled = true;
+  }
+
+  /* ---------------- analysis ---------------- */
+
+  function runAnalysis() {
+    if (state.running) return;
+    var parsed = state.parsed;
+    if (!parsed || parsed.draws.length < 4) return;
+
+    state.running = true;
+    var btn = $("btnAnalyze");
+    btn.disabled = true;
+
+    var draws = state.parsed.draws;
+    var cfg = state.config;
+
+    // Each tool refits repeatedly, which is heavy for long histories. Run the
+    // stages in sequence with a yield between them so the browser can paint
+    // progress instead of showing a frozen tab.
+    var stages = [
+      ["Testing against the null…", function () {
+        state.diag = E.diagnostics(draws, cfg);
+        state.tests = E.structureTests(draws, cfg);
+        state.envelope = E.monteCarloEnvelope(draws, cfg, { seed: state.mcSeed });
+      }],
+      ["Searching for a law…", function () {
+        state.results.analytic = {
+          model: E.deriveAnalyticLaw(draws, cfg),
+          backtest: E.backtest(draws, cfg, E.scorerFor("analytic", cfg))
+        };
+      }],
+      ["Fitting recurrence frequencies…", function () {
+        state.results.stochastic = {
+          model: E.stochasticModel(draws, cfg, state.stochasticOpts),
+          backtest: E.backtest(draws, cfg, E.scorerFor("stochastic", cfg, state.stochasticOpts))
+        };
+      }],
+      ["Learning the mixture online…", function () {
+        var hybrid = E.hybridModel(draws, cfg);
+        state.results.hybrid = {
+          model: hybrid,
+          backtest: E.evaluateForecasts(hybrid.prequential, draws, cfg)
+        };
+      }]
+    ];
+
+    state.results = {};
+    var i = 0;
+
+    function fail(err) {
+      el.verdictHost.hidden = false;
+      el.verdictHost.innerHTML =
+        '<div class="card"><div class="callout is-danger"><strong>Analysis failed.</strong> ' +
+        esc(err && err.message ? err.message : String(err)) +
+        "</div></div>";
+      if (window.console) console.error(err);
+      done();
+    }
+
+    function done() {
+      state.running = false;
+      btn.disabled = false;
+      btn.textContent = "Run analysis";
+      showProgress("");
+    }
+
+    function tick() {
+      if (i >= stages.length) {
+        try {
+          var recommend =
+            state.diag.mode === "pattern" ? "analytic"
+            : state.diag.mode === "mixed" ? "hybrid"
+            : "stochastic";
+          state.recommended = recommend;
+          state.tool = recommend;
+          // Monte Carlo next-draw simulation from the recommended model.
+          var probs = E.scorerFor(recommend, cfg, state.stochasticOpts)(draws);
+          state.predMC = E.predictionMonteCarlo(probs, cfg, { seed: state.mcSeed });
+          state.predTool = recommend;
+          render();
+          persist();
+        } catch (err) {
+          return fail(err);
+        }
+        return done();
+      }
+      var stage = stages[i++];
+      btn.textContent = "Analysing…";
+      showProgress(stage[0]);
+      setTimeout(function () {
+        try {
+          stage[1]();
+        } catch (err) {
+          return fail(err);
+        }
+        tick();
+      }, 16);
+    }
+
+    setTimeout(tick, 16);
+  }
+
+  function showProgress(text) {
+    var host = el.detectHint;
+    if (!host) return;
+    if (!text) {
+      host.innerHTML = host.getAttribute("data-prev") || "";
+      host.removeAttribute("data-prev");
+      return;
+    }
+    if (!host.hasAttribute("data-prev")) host.setAttribute("data-prev", host.innerHTML);
+    host.innerHTML = '<span class="spinner-note"><i class="spinner"></i>' + esc(text) + "</span>";
+  }
+
+  function render() {
+    renderVerdict();
+    el.toolSection.hidden = false;
+    renderAnalytic();
+    renderStochastic();
+    renderHybrid();
+    selectTool(state.tool);
+    renderPredictionMC();
+    $("btnExport").disabled = false;
+  }
+
+  // Monte Carlo next-draw card sits below the tool panels and reflects the
+  // currently selected tool's model.
+  function renderPredictionMC() {
+    var host = $("predictionHost");
+    if (!host) return;
+    if (!state.predMC) { host.hidden = true; host.innerHTML = ""; return; }
+    host.hidden = false;
+    host.innerHTML = predictionMonteCarloCard();
+    var btn = $("btnResim");
+    if (btn) btn.addEventListener("click", resimulate);
+  }
+
+  function resimulate() {
+    if (!state.parsed || !state.parsed.draws.length) return;
+    state.mcSeed = (state.mcSeed * 1664525 + 1013904223) >>> 0;
+    var draws = state.parsed.draws;
+    var cfg = state.config;
+    state.envelope = E.monteCarloEnvelope(draws, cfg, { seed: state.mcSeed });
+    var probs = E.scorerFor(state.predTool || state.recommended || "stochastic", cfg, state.stochasticOpts)(draws);
+    state.predMC = E.predictionMonteCarlo(probs, cfg, { seed: state.mcSeed });
+    renderStochastic();
+    renderPredictionMC();
+  }
+
+  /* ---------------- verdict ---------------- */
+
+  var MODE_COPY = {
+    pattern: {
+      icon: "&#9673;",
+      title: "Pattern detected",
+      tool: "Tool 1 — analytic derivation",
+      body:
+        "A closed-form recurrence reproduces draws it was never fitted on. This series is not " +
+        "behaving like a chance mechanism."
+    },
+    random: {
+      icon: "&#9678;",
+      title: "No pattern detected",
+      tool: "Tool 2 — stochastic recurrence model",
+      body:
+        "Every structure in this history is within the range random data produces by chance. " +
+        "The honest model describes recurrence frequency, not a law."
+    },
+    mixed: {
+      icon: "&#9680;",
+      title: "Mixed pattern",
+      tool: "Tool 3 — hybrid ensemble",
+      body:
+        "Some components deviate from the null while the rest look exchangeable. A single " +
+        "explanation would be wrong in one direction or the other."
+    },
+    insufficient: {
+      icon: "&#9888;",
+      title: "Not enough data",
+      tool: "Collect more draws",
+      body:
+        "With this few observations almost any hypothesis fits. Any 'law' found here would be " +
+        "an artefact of small samples."
+    }
+  };
+
+  function renderVerdict() {
+    var d = state.diag;
+    var c = MODE_COPY[d.mode] || MODE_COPY.random;
+    el.verdictHost.hidden = false;
+    el.verdictHost.innerHTML =
+      '<div class="verdict mode-' + d.mode + '">' +
+        '<div class="verdict-badge">' + c.icon + "</div>" +
+        "<div>" +
+          "<h2>" + c.title + "</h2>" +
+          "<p>" + c.body + "</p>" +
+        "</div>" +
+        '<div class="verdict-cta">' +
+          '<span class="tag">' + esc(c.tool) + "</span>" +
+          '<span class="hint">' + state.parsed.draws.length + " draws · " +
+            state.config.picks + "/" + state.config.poolSize + "</span>" +
+        "</div>" +
+      "</div>" +
+      '<div class="card" style="margin-top:16px">' +
+        '<div class="card-head"><div><h3>Evidence behind the routing</h3>' +
+        "<p>Five independent checks against exchangeable sampling without replacement.</p></div></div>" +
+        '<div class="grid-3">' + diagnosticCards(d) + "</div>" +
+      "</div>" +
+      structureTestsCard();
+  }
+
+  function diagnosticCards(d) {
+    var q = state.config.picks / state.config.poolSize;
+    var cards = [];
+
+    cards.push(metric(
+      "Frequency goodness-of-fit",
+      "χ² = " + d.chi.stat.toFixed(1),
+      "p = " + fmtP(d.chi.p) + " on " + d.chi.df + " df" +
+        (d.chi.p < 0.05 ? " — counts are uneven" : " — consistent with uniform"),
+      d.chi.p < 0.05 ? "is-warn" : "is-good"
+    ));
+
+    cards.push(metric(
+      "Numbers off the null (FDR 5%)",
+      String(d.perNumber.fdr.survivors.length),
+      d.perNumber.fdr.survivors.length
+        ? "survive multiplicity correction"
+        : "none survive — expected for fair draws",
+      d.perNumber.fdr.survivors.length ? "is-warn" : "is-good"
+    ));
+
+    cards.push(metric(
+      "Serial dependence (lag 1)",
+      d.autocorrelation.lag1.toFixed(3),
+      "z = " + d.autocorrelation.z.toFixed(2) +
+        (Math.abs(d.autocorrelation.z) > 2 ? " — draws are not independent" : " — no memory detected"),
+      Math.abs(d.autocorrelation.z) > 2 ? "is-warn" : "is-good"
+    ));
+
+    cards.push(metric(
+      "Stationarity (first vs second half)",
+      d.stationarity.testable ? "p = " + fmtP(d.stationarity.p) : "n/a",
+      d.stationarity.testable
+        ? d.stationarity.p < 0.05
+          ? "the mechanism changed over time"
+          : "no regime change detected"
+        : "needs at least 16 draws",
+      d.stationarity.testable && d.stationarity.p < 0.05 ? "is-warn" : "is-good"
+    ));
+
+    cards.push(metric(
+      "Entropy ratio",
+      d.entropyRatio.toFixed(4),
+      d.entropyRatio > 0.985 ? "near-maximal — looks unstructured" : "below maximal — mass is concentrated",
+      d.entropyRatio > 0.985 ? "is-good" : "is-warn"
+    ));
+
+    cards.push(metric(
+      "Mean recurrence gap",
+      d.gaps.observedMean ? d.gaps.observedMean.toFixed(1) : "—",
+      "theory 1/q = " + (1 / q).toFixed(1) + " draws" +
+        (d.gaps.n ? " (" + d.gaps.n + " intervals)" : ""),
+      "is-good"
+    ));
+
+    return cards.join("");
+  }
+
+  /* ------- ported structure & randomness battery (from the prototype) ------- */
+
+  function structureTestsCard() {
+    var t = state.tests;
+    if (!t) return "";
+    var tiles = [];
+
+    if (t.runs && t.runs.testable) {
+      tiles.push(metric(
+        "Runs test (clustering)",
+        "z = " + t.runs.z.toFixed(2),
+        t.runs.runs + " runs vs " + t.runs.expected.toFixed(1) + " expected · p = " + fmtP(t.runs.p) +
+          (t.runs.p < 0.05 ? " — values cluster in time" : " — no clustering"),
+        t.runs.p < 0.05 ? "is-warn" : "is-good"
+      ));
+    }
+    if (t.ks && t.ks.testable) {
+      tiles.push(metric(
+        "KS test vs uniform",
+        "D = " + t.ks.stat.toFixed(3),
+        "p = " + fmtP(t.ks.p) + (t.ks.p < 0.05 ? " — distribution is not uniform" : " — consistent with uniform"),
+        t.ks.p < 0.05 ? "is-warn" : "is-good"
+      ));
+    }
+    if (t.spectral && t.spectral.testable) {
+      tiles.push(metric(
+        "Spectral concentration",
+        (t.spectral.concentration * 100).toFixed(1) + "%",
+        (t.spectral.dominantPeriod ? "top period ≈ " + t.spectral.dominantPeriod.toFixed(1) + " draws · " : "") +
+          (t.spectral.concentration > 0.6 ? "a dominant cycle is present" : "flat spectrum — no dominant cycle"),
+        t.spectral.concentration > 0.6 ? "is-warn" : "is-good"
+      ));
+    }
+
+    var poissonNote = "";
+    if (t.poisson) {
+      var ex = t.poisson.mostExtreme && t.poisson.mostExtreme.length ? t.poisson.mostExtreme[0] : null;
+      poissonNote =
+        '<p class="footnote" style="margin-top:14px"><strong>Poisson recurrence check.</strong> ' +
+        "Each number is expected about " + t.poisson.lambda.toFixed(1) + " times in " + t.poisson.draws +
+        " draws. The single most extreme number (" + (ex ? ex.number : "—") + ", seen " +
+        (ex ? ex.count : "—") + "×) has tail probability p ≈ " + (ex ? fmtP(ex.pGe) : "—") +
+        "; with " + state.config.poolSize + " numbers the honest significance line is p &lt; " +
+        fmtP(t.poisson.bonferroni) + ". A single 'hot' or 'overdue' number almost never clears it." +
+        "</p>";
+    }
+
+    if (!tiles.length && !poissonNote) return "";
+    return (
+      '<div class="card" style="margin-top:16px">' +
+        '<div class="card-head"><div><h3>Structure &amp; randomness battery</h3>' +
+        "<p>Independent checks on how random the series itself is — ported from the prototype. " +
+        "These judge structure, never predict a next draw.</p></div></div>" +
+        (tiles.length ? '<div class="grid-3">' + tiles.join("") + "</div>" : "") +
+        poissonNote +
+      "</div>"
+    );
+  }
+
+  function metric(label, value, note, cls) {
+    return (
+      '<div class="metric ' + (cls || "") + '">' +
+      "<span>" + esc(label) + "</span>" +
+      "<strong>" + value + "</strong>" +
+      "<small>" + esc(note) + "</small>" +
+      "</div>"
+    );
+  }
+
+  /* ---------------- tool switching ---------------- */
+
+  function selectTool(tool) {
+    state.tool = tool;
+    // Keep the Monte Carlo next-draw simulation on the selected tool's model.
+    if (state.parsed && state.parsed.draws.length && state.results[tool]) {
+      var cfg = state.config;
+      var probs = E.scorerFor(tool, cfg, state.stochasticOpts)(state.parsed.draws);
+      state.predMC = E.predictionMonteCarlo(probs, cfg, { seed: state.mcSeed });
+      state.predTool = tool;
+    }
+    Array.prototype.forEach.call(document.querySelectorAll(".tool-tab"), function (t) {
+      var on = t.getAttribute("data-tool") === tool;
+      t.classList.toggle("is-active", on);
+      t.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    Object.keys(el.panels).forEach(function (k) {
+      el.panels[k].hidden = k !== tool;
+      el.panels[k].classList.toggle("is-active", k === tool);
+    });
+    // Recommendation flags
+    Array.prototype.forEach.call(document.querySelectorAll("[data-flag]"), function (f) {
+      var key = f.getAttribute("data-flag");
+      var r = state.results[key];
+      var isRec = state.recommended === key;
+      f.classList.toggle("is-recommended", isRec);
+      if (isRec) {
+        f.textContent = "Recommended";
+      } else if (r && r.backtest && r.backtest.testable) {
+        f.textContent = r.backtest.beatsChance ? "Beats chance" : "No edge found";
+      } else {
+        f.textContent = "Available";
+      }
+    });
+    renderPredictionMC();
+    persist();
+  }
+
+  /* ---------------- Tool 1: analytic ---------------- */
+
+  function renderAnalytic() {
+    var r = state.results.analytic;
+    var m = r.model;
+    var bt = r.backtest;
+    var html = "";
+
+    if (m.verdict === "insufficient") {
+      html = card("Analytic derivation", "", '<div class="empty-state">Need at least 6 draws to attempt a derivation.</div>');
+      el.panels.analytic.innerHTML = html;
+      return;
+    }
+
+    if (!m.best) {
+      html += card(
+        "No law survived validation",
+        "The restricted hypothesis class was searched exhaustively.",
+        '<div class="callout is-warn"><strong>This is a real result, not a failure.</strong> ' +
+          "Every candidate recurrence either failed to fit the training prefix or fit it and then " +
+          "collapsed on the held-out draws. A law that cannot predict unseen observations is " +
+          "curve-fitting, and the lab refuses to report it." +
+        "</div>" +
+        '<div class="stack" style="margin-top:16px">' +
+          "<h4 style=\"font-size:0.85rem\">Closest candidates (all rejected)</h4>" +
+          candidateTable(m.candidates.slice(0, 6)) +
+        "</div>"
+      );
+    } else {
+      var law = m.best;
+      html += card(
+        m.verdict === "exact-law" ? "Law derived and validated" : "Partial law derived",
+        "Selected by minimum description length among candidates that survived out-of-sample validation.",
+        '<div class="formula">' + esc(law.formula) + "</div>" +
+        '<p class="hint" style="margin-top:10px">Applies to: <strong>' + esc(law.seriesName) + "</strong></p>" +
+        '<div class="grid-3" style="margin-top:16px">' +
+          metric("Training accuracy", pct(law.trainAccuracy), law.trainTotal + " transitions fitted", "") +
+          metric("Held-out accuracy", pct(law.valAccuracy), law.valTotal + " transitions never seen during fitting",
+            law.valAccuracy >= 0.85 ? "is-good" : "is-warn") +
+          metric("Description length", law.descriptionBits.toFixed(1) + " bits", "lower is simpler", "") +
+        "</div>" +
+        (m.positionLaws && m.positionLaws.admissible
+          ? '<div class="stack" style="margin-top:20px">' +
+              "<h4 style=\"font-size:0.85rem\">Deterministic prediction for the next draw</h4>" +
+              '<div class="prediction-row">' +
+                m.positionLaws.prediction.map(function (n) {
+                  return '<div class="pred-ball is-law">' + n + "</div>";
+                }).join("") +
+              "</div>" +
+              '<p class="hint">Every ascending position carries its own validated law ' +
+                "(mean held-out accuracy " + pct(m.positionLaws.meanValAccuracy) + "). " +
+                "Reported as a probabilistic forecast, not a certainty.</p>" +
+            "</div>"
+          : '<div class="callout" style="margin-top:16px">A law was found for one series, but not ' +
+            "for every position, so a complete next-draw reconstruction is not available.</div>") +
+        '<div class="stack" style="margin-top:20px">' +
+          "<h4 style=\"font-size:0.85rem\">All surviving candidates</h4>" +
+          candidateTable(m.survivors.slice(0, 8)) +
+        "</div>"
+      );
+    }
+
+    html += backtestCard(bt, "analytic");
+    html += card(
+      "Hypothesis class",
+      "The search space is deliberately small — that restriction is what makes a positive result meaningful.",
+      '<div class="grid-2">' +
+        hypoNote("Constant", "x&#8345; = c") +
+        hypoNote("Arithmetic progression", "x&#8345; = (x&#8345;&#8331;&#8321; + d) mod M") +
+        hypoNote("Affine recurrence", "x&#8345; = (a·x&#8345;&#8331;&#8321; + b) mod M") +
+        hypoNote("Second-order linear", "x&#8345; = (a·x&#8345;&#8331;&#8321; + b·x&#8345;&#8331;&#8322; + c) mod M") +
+        hypoNote("Periodic cycle", "x&#8345; = x&#8345;&#8331;&#8346;") +
+        hypoNote("Polynomial in n", "&#916;&#7496;x&#8345; = const") +
+      "</div>"
+    );
+
+    el.panels.analytic.innerHTML = html;
+  }
+
+  function hypoNote(name, formula) {
+    return (
+      '<div class="metric"><span>' + esc(name) + "</span>" +
+      '<strong style="font-family:var(--mono);font-size:0.86rem">' + formula + "</strong></div>"
+    );
+  }
+
+  function candidateTable(rows) {
+    if (!rows || !rows.length) {
+      return '<div class="empty-state">No candidate produced a usable fit.</div>';
+    }
+    return (
+      '<div class="table-wrap"><table><thead><tr>' +
+      "<th>Hypothesis</th><th>Series</th><th>Formula</th>" +
+      '<th class="num">Train</th><th class="num">Held-out</th><th class="num">Bits</th>' +
+      "</tr></thead><tbody>" +
+      rows.map(function (c) {
+        return (
+          "<tr><td>" + esc(c.name) + "</td><td>" + esc(c.seriesName) + "</td>" +
+          '<td style="font-family:var(--mono);font-size:0.78rem">' + esc(c.formula) + "</td>" +
+          '<td class="num">' + pct(c.trainAccuracy) + "</td>" +
+          '<td class="num">' + pct(c.valAccuracy) + "</td>" +
+          '<td class="num">' + c.descriptionBits.toFixed(0) + "</td></tr>"
+        );
+      }).join("") +
+      "</tbody></table></div>"
+    );
+  }
+
+  /* ---------------- Tool 2: stochastic ---------------- */
+
+  function renderStochastic() {
+    var r = state.results.stochastic;
+    var m = r.model;
+    var bt = r.backtest;
+    var q = state.config.picks / state.config.poolSize;
+
+    var controls =
+      '<div class="grid-2">' +
+        '<div class="slider-row">' +
+          '<div class="row-between"><label for="optPrior">Prior strength (pseudo-draws)</label>' +
+          '<output id="outPrior">' + state.stochasticOpts.priorStrength + "</output></div>" +
+          '<input type="range" id="optPrior" min="0" max="200" step="5" value="' +
+            state.stochasticOpts.priorStrength + '">' +
+          '<p class="hint">How much belief in a fair mechanism the data must overcome. ' +
+            "Currently shrinking observed rates " + pct(m.shrinkage) + " toward q.</p>" +
+        "</div>" +
+        '<div class="slider-row">' +
+          '<div class="row-between"><label for="optDecay">Memory (EWMA decay λ)</label>' +
+          '<output id="outDecay">' + state.stochasticOpts.decay.toFixed(2) + "</output></div>" +
+          '<input type="range" id="optDecay" min="0.80" max="1.00" step="0.01" value="' +
+            state.stochasticOpts.decay + '">' +
+          '<p class="hint">λ = 1.00 assumes a stationary process. Below 1 discounts old draws, ' +
+            "which is the right move only if the mechanism genuinely drifts.</p>" +
+        "</div>" +
+      "</div>";
+
+    var head =
+      '<div class="grid-3">' +
+        metric("Draws observed", String(m.summary.D), "expected " + m.summary.expectedCount.toFixed(1) + " hits per number", "") +
+        metric("Numbers beyond the null", String(m.significantCount),
+          m.significantCount ? "after Benjamini-Hochberg FDR control" : "no number deviates once multiplicity is handled",
+          m.significantCount ? "is-warn" : "is-good") +
+        metric("Posterior shrinkage", pct(m.shrinkage), "weight still held by the prior", "") +
+      "</div>";
+
+    var rows = m.ranked.slice(0, 15).map(function (row) {
+      var cls = row.significant ? "is-hot" : row.lift < 0.9 ? "is-cold" : "";
+      return (
+        "<tr>" +
+        '<td><span class="ball ' + cls + '">' + row.number + "</span></td>" +
+        '<td class="num">' + row.count + "</td>" +
+        '<td class="num">' + row.expected.toFixed(1) + "</td>" +
+        '<td class="num">' + (row.posteriorMean * 100).toFixed(2) + "%</td>" +
+        '<td class="num">[' + (row.ci[0] * 100).toFixed(2) + ", " + (row.ci[1] * 100).toFixed(2) + "]</td>" +
+        '<td class="num">' + row.lift.toFixed(2) + "×</td>" +
+        '<td class="num">' + row.currentGap + "</td>" +
+        '<td class="num">' + fmtP(row.p) + "</td>" +
+        '<td><span class="tag ' + (row.significant ? "is-sig" : "is-null") + '">' +
+          (row.significant ? "deviates" : "null") + "</span></td>" +
+        "</tr>"
+      );
+    }).join("");
+
+    var table =
+      '<div class="table-wrap"><table><thead><tr>' +
+      "<th>Number</th>" +
+      '<th class="num">Seen</th><th class="num">Expected</th>' +
+      '<th class="num">Posterior rate</th><th class="num">95% CI</th>' +
+      '<th class="num">Lift</th><th class="num">Gap</th><th class="num">p</th><th>Verdict</th>' +
+      "</tr></thead><tbody>" + rows + "</tbody></table></div>";
+
+    var gapCard = card(
+      "Recurrence intervals",
+      "Under a memoryless mechanism the waiting time between appearances is geometric with mean 1/q = " +
+        (1 / q).toFixed(1) + " draws.",
+      histogram(state.diag.gaps.all, 1 / q) +
+      '<div class="callout is-warn" style="margin-top:14px"><strong>The gambler\'s fallacy, quantified.</strong> ' +
+        "A number absent for " + Math.max.apply(null, m.rows.map(function (x) { return x.currentGap; })) +
+        " draws is no more likely to appear next: the hazard rate stays flat at q = " + (q * 100).toFixed(2) +
+        "% regardless of history. Any 'due number' logic is reading structure into memorylessness.</div>"
+    );
+
+    el.panels.stochastic.innerHTML =
+      card("Stochastic recurrence model",
+        "Beta-Binomial posterior per number, prior centred on the hypergeometric rate q = k/N.",
+        controls + head) +
+      card("Per-number posterior", "Ranked by predictive probability for the next draw. Top 15 shown.", table) +
+      monteCarloEnvelopeCard() +
+      gapCard +
+      backtestCard(bt, "stochastic");
+
+    var p = $("optPrior");
+    var dsl = $("optDecay");
+    if (p) {
+      p.addEventListener("input", function () { $("outPrior").textContent = p.value; });
+      p.addEventListener("change", function () {
+        state.stochasticOpts.priorStrength = Number(p.value);
+        recomputeStochastic();
+      });
+    }
+    if (dsl) {
+      dsl.addEventListener("input", function () { $("outDecay").textContent = Number(dsl.value).toFixed(2); });
+      dsl.addEventListener("change", function () {
+        state.stochasticOpts.decay = Number(dsl.value);
+        recomputeStochastic();
+      });
+    }
+  }
+
+  function recomputeStochastic() {
+    var draws = state.parsed.draws;
+    var cfg = state.config;
+    state.results.stochastic = {
+      model: E.stochasticModel(draws, cfg, state.stochasticOpts),
+      backtest: E.backtest(draws, cfg, E.scorerFor("stochastic", cfg, state.stochasticOpts))
+    };
+    renderStochastic();
+    persist();
+  }
+
+  /* ---------------- Tool 3: hybrid ---------------- */
+
+  function renderHybrid() {
+    var r = state.results.hybrid;
+    var m = r.model;
+    var bt = r.backtest;
+
+    if (!m.rounds) {
+      el.panels.hybrid.innerHTML = card(
+        "Hybrid ensemble",
+        "",
+        '<div class="empty-state">Not enough draws to run the online mixture. Add more observations.</div>'
+      );
+      return;
+    }
+
+    var expertRows = m.experts.map(function (e) {
+      return (
+        "<tr><td><strong>" + esc(e.name) + "</strong><br>" +
+        '<span class="hint">' + esc(e.note) + "</span></td>" +
+        '<td class="num">' + pct(e.weight) + "</td>" +
+        '<td class="num">' + (e.meanLoss == null ? "—" : e.meanLoss.toFixed(4)) + "</td>" +
+        "<td>" + weightBar(e.weight) + "</td></tr>"
+      );
+    }).join("");
+
+    var structure = m.structureShare;
+    var interpretation =
+      structure > 0.6
+        ? "The mixture has moved decisively onto the analytic channel: this series is mostly law."
+        : structure < 0.15
+        ? "The mixture keeps almost no weight on the analytic channel: this series is mostly chance."
+        : "Weight is genuinely split. Part of this series is structured and part is noise — which is " +
+          "exactly the case a single-explanation model gets wrong.";
+
+    var top = m.ranked.slice(0, state.config.picks);
+
+    el.panels.hybrid.innerHTML =
+      card("Hybrid ensemble",
+        "Four experts compete under log loss; multiplicative weights (Hedge) learn the mixture online. " +
+          "The learned weights are the finding.",
+        '<div class="grid-3">' +
+          metric("Structure share", pct(structure), "weight on the analytic channel",
+            structure > 0.5 ? "is-warn" : "is-good") +
+          metric("Chance share", pct(m.noiseShare), "weight on null + frequency + adaptive", "") +
+          metric("Online rounds", String(m.rounds), "sequential predict-then-update steps", "") +
+        "</div>" +
+        '<div class="callout" style="margin-top:16px">' + esc(interpretation) + "</div>") +
+      card("Expert weights", "Learned from sequential prediction, not from goodness of fit.",
+        '<div class="table-wrap"><table><thead><tr><th>Expert</th>' +
+        '<th class="num">Weight</th><th class="num">Mean log loss</th><th style="width:34%">Share</th>' +
+        "</tr></thead><tbody>" + expertRows + "</tbody></table></div>") +
+      card("Weight trajectory", "How belief moved as each new draw arrived.",
+        trajectoryChart(m) +
+        '<div class="legend" style="margin-top:10px">' +
+          m.experts.map(function (e, i) {
+            return '<span><i class="swatch" style="background:' + EXPERT_COLORS[i] + '"></i>' + esc(e.name) + "</span>";
+          }).join("") +
+        "</div>") +
+      card("Blended forecast", "Top " + state.config.picks + " numbers by mixture probability for the next draw.",
+        '<div class="prediction-row">' +
+          top.map(function (t) {
+            return '<div class="pred-ball is-hybrid">' + t.number + "</div>";
+          }).join("") +
+        "</div>" +
+        '<p class="hint" style="margin-top:12px">Highest mixture probability ' +
+          (top[0].probability * 100).toFixed(2) + "% versus null " +
+          ((state.config.picks / state.config.poolSize) * 100).toFixed(2) + "% (" +
+          top[0].lift.toFixed(2) + "× lift). " +
+          (Math.abs(top[0].lift - 1) < 0.15
+            ? "That is within noise — treat this as a ranking, not an edge."
+            : "") +
+        "</p>") +
+      backtestCard(bt, "hybrid");
+  }
+
+  var EXPERT_COLORS = ["#8b99ad", "#0b65d8", "#f59e0b", "#7c5cf0"];
+
+  function weightBar(w) {
+    return (
+      '<div style="height:8px;border-radius:99px;background:var(--surface-soft);overflow:hidden">' +
+      '<div style="height:100%;width:' + (w * 100).toFixed(1) +
+      '%;background:var(--blue);border-radius:99px"></div></div>'
+    );
+  }
+
+  function trajectoryChart(m) {
+    var traj = m.trajectory;
+    if (!traj.length) return "";
+    var W = 720, H = 200, pad = 28;
+    var n = traj.length;
+    var paths = m.experts.map(function (e, j) {
+      var pts = traj.map(function (p, i) {
+        var x = pad + (i / Math.max(1, n - 1)) * (W - pad * 2);
+        var y = H - pad - p.weights[j] * (H - pad * 2);
+        return (i ? "L" : "M") + x.toFixed(1) + " " + y.toFixed(1);
+      }).join(" ");
+      return '<path d="' + pts + '" fill="none" stroke="' + EXPERT_COLORS[j] + '" stroke-width="2.2" />';
+    }).join("");
+
+    return (
+      '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Expert weight trajectory">' +
+      '<line x1="' + pad + '" y1="' + (H - pad) + '" x2="' + (W - pad) + '" y2="' + (H - pad) + '" stroke="#dce4ef"/>' +
+      '<line x1="' + pad + '" y1="' + pad + '" x2="' + pad + '" y2="' + (H - pad) + '" stroke="#dce4ef"/>' +
+      '<text x="' + (pad - 6) + '" y="' + (pad + 4) + '" text-anchor="end" font-size="10" fill="#8b99ad">1.0</text>' +
+      '<text x="' + (pad - 6) + '" y="' + (H - pad) + '" text-anchor="end" font-size="10" fill="#8b99ad">0</text>' +
+      '<text x="' + (W / 2) + '" y="' + (H - 6) + '" text-anchor="middle" font-size="10" fill="#8b99ad">draw index</text>' +
+      paths +
+      "</svg>"
+    );
+  }
+
+  /* ---------------- Monte Carlo: observed vs expected ---------------- */
+
+  function monteCarloEnvelopeCard() {
+    var env = state.envelope;
+    if (!env) return "";
+    var interp = env.outsideCount <= Math.ceil(env.expectedOutside * 2)
+      ? '<div class="callout is-good"><strong>Consistent with chance.</strong> ' +
+        env.outsideCount + " of " + env.rows.length + " numbers sit outside the " + Math.round(env.level * 100) +
+        "% Monte Carlo envelope — about what a fair mechanism throws off by luck (~" +
+        env.expectedOutside.toFixed(1) + ")." + "</div>"
+      : '<div class="callout is-warn"><strong>More structure than chance explains.</strong> ' +
+        env.outsideCount + " of " + env.rows.length + " numbers sit outside the " + Math.round(env.level * 100) +
+        "% envelope, well beyond the ~" + env.expectedOutside.toFixed(1) + " expected from a fair mechanism. " +
+        "The mechanism is unlikely to be uniform.</div>";
+
+    return card(
+      "Observed vs expected — Monte Carlo envelope",
+      env.replicates.toLocaleString() + " null replications of " + env.draws + " draws of " +
+        state.config.picks + " from " + state.config.poolSize + ". Bars are observed counts; " +
+        "the band is the " + Math.round(env.level * 100) + "% envelope chance produces.",
+      envelopeChart(env) +
+      '<div class="legend" style="margin-top:8px">' +
+        '<span><i class="swatch" style="background:#0b65d8"></i>observed count</span>' +
+        '<span><i class="swatch" style="background:#e65f6a"></i>outside envelope</span>' +
+        '<span><i class="swatch" style="background:#c9d4e4"></i>' + Math.round(env.level * 100) + "% envelope</span>" +
+      "</div>" +
+      '<div style="margin-top:14px">' + interp + "</div>"
+    );
+  }
+
+  function envelopeChart(env) {
+    var rows = env.rows;
+    var W = 720, H = 220, pad = 34;
+    var maxV = Math.max.apply(null, rows.map(function (r) {
+      return Math.max(r.observed, r.envelopeHi);
+    })) || 1;
+    var n = rows.length;
+    var bw = (W - pad * 2) / n;
+    function y(v) { return H - pad - (v / maxV) * (H - pad * 2); }
+
+    var bands = "";
+    var bars = "";
+    var labels = "";
+    for (var i = 0; i < n; i++) {
+      var r = rows[i];
+      var x = pad + i * bw;
+      var cx = x + bw / 2;
+      // envelope band
+      bands += '<rect x="' + x.toFixed(1) + '" y="' + y(r.envelopeHi).toFixed(1) +
+        '" width="' + Math.max(1, bw - 1).toFixed(1) +
+        '" height="' + (y(r.envelopeLo) - y(r.envelopeHi)).toFixed(1) +
+        '" fill="#c9d4e4" opacity="0.45"/>';
+      // observed bar, red if outside
+      var outside = r.observed < r.envelopeLo || r.observed > r.envelopeHi;
+      bars += '<rect x="' + (x + bw * 0.2).toFixed(1) + '" y="' + y(r.observed).toFixed(1) +
+        '" width="' + Math.max(1, bw * 0.6).toFixed(1) +
+        '" height="' + (H - pad - y(r.observed)).toFixed(1) +
+        '" fill="' + (outside ? "#e65f6a" : "#0b65d8") + '" rx="1"/>';
+      if (n <= 60 && (i % Math.ceil(n / 24) === 0)) {
+        labels += '<text x="' + cx.toFixed(1) + '" y="' + (H - pad + 14) +
+          '" text-anchor="middle" font-size="8.5" fill="#8b99ad">' + r.number + "</text>";
+      }
+    }
+    var ey = y(env.expectedCount);
+    return (
+      '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Observed counts vs Monte Carlo envelope">' +
+      '<line x1="' + pad + '" y1="' + (H - pad) + '" x2="' + (W - pad) + '" y2="' + (H - pad) + '" stroke="#dce4ef"/>' +
+      bands + bars +
+      '<line x1="' + pad + '" y1="' + ey.toFixed(1) + '" x2="' + (W - pad) + '" y2="' + ey.toFixed(1) +
+        '" stroke="#0a7a55" stroke-dasharray="4 3" stroke-width="1.4"/>' +
+      '<text x="' + (W - pad) + '" y="' + (ey - 5).toFixed(1) + '" text-anchor="end" font-size="10" fill="#0a7a55">expected ' +
+        env.expectedCount.toFixed(1) + "</text>" +
+      labels +
+      '<text x="' + (pad - 6) + '" y="' + (pad + 4) + '" text-anchor="end" font-size="10" fill="#8b99ad">' + maxV + "</text>" +
+      '<text x="' + (pad - 6) + '" y="' + (H - pad) + '" text-anchor="end" font-size="10" fill="#8b99ad">0</text>' +
+      "</svg>"
+    );
+  }
+
+  /* ---------------- Monte Carlo: prediction pattern + next set ---------------- */
+
+  function predictionMonteCarloCard() {
+    var mc = state.predMC;
+    if (!mc) return "";
+    var toolName = { analytic: "Analytic derivation", stochastic: "Stochastic recurrence", hybrid: "Hybrid ensemble" }[state.predTool] || "Model";
+    var k = state.config.picks;
+    var N = state.config.poolSize;
+    var top = mc.topNumbers;
+
+    var ratesChart = predictionRatesChart(mc);
+
+    var nextSet =
+      '<div class="prediction-row">' +
+        mc.modalSet.map(function (n) {
+          return '<div class="pred-ball">' + n + "</div>";
+        }).join("") +
+      "</div>";
+
+    var framing =
+      mc.concentration > 2
+        ? '<div class="callout is-warn"><strong>The model concentrates probability.</strong> Its most likely exact set is ' +
+          fmtSmall(mc.modalSetProb) + " — about " + mc.concentration.toFixed(1) + "× the " + fmtSmall(mc.nullSetProb) +
+          " a random set carries. That is real structure <em>if the model is right</em>; it is still one set out of " +
+          Number(mc.totalSets).toLocaleString(undefined, { maximumFractionDigits: 0 }) + " possible.</div>"
+        : '<div class="callout"><strong>The model spreads probability near-evenly.</strong> Its most likely exact set is ' +
+          fmtSmall(mc.modalSetProb) + ", close to the " + fmtSmall(mc.nullSetProb) +
+          " any random set carries — which is what an honest model says when the mechanism is near-fair. " +
+          "No set is meaningfully more likely than another.</div>";
+
+    return card(
+      "Next-draw prediction — Monte Carlo",
+      mc.replicates.toLocaleString() + " simulated next draws from the " + esc(toolName) +
+        " probability vector. A distribution, not a promise. " +
+        '<button class="chip-button" type="button" id="btnResim" style="float:right">Re-run simulation</button>',
+      '<div class="grid-3" style="margin-bottom:16px">' +
+        metric("Top predicted number", String(top[0].number),
+          (top[0].predictedRate * 100).toFixed(1) + "% vs null " + (top[0].nullRate * 100).toFixed(1) + "% (" +
+          top[0].lift.toFixed(2) + "×)", Math.abs(top[0].lift - 1) < 0.2 ? "" : "is-warn") +
+        metric("Exact-set probability", fmtSmall(mc.modalSetProb),
+          "modal set vs " + fmtSmall(mc.nullSetProb) + " for any set", "") +
+        metric("Possible sets", Number(mc.totalSets).toLocaleString(undefined, { maximumFractionDigits: 0 }),
+          "C(" + N + ", " + k + ") combinations", "") +
+      "</div>" +
+      "<h4 style=\"font-size:0.85rem;margin-bottom:10px\">Predicted rate per number vs null</h4>" +
+      ratesChart +
+      "<h4 style=\"font-size:0.85rem;margin:18px 0 10px\">Most likely next set (top " + k + " by model probability)</h4>" +
+      nextSet +
+      '<p class="hint" style="margin-top:12px">Highest per-number rate ' + (top[0].predictedRate * 100).toFixed(1) +
+        "% versus null " + (top[0].nullRate * 100).toFixed(1) + "%. " +
+        (Math.abs(top[0].lift - 1) < 0.2 ? "Within noise — treat as a ranking, not an edge." : "") + "</p>" +
+      '<div style="margin-top:14px">' + framing + "</div>"
+    );
+  }
+
+  function predictionRatesChart(mc) {
+    var rows = mc.rows;
+    var W = 720, H = 180, pad = 30;
+    var maxV = Math.max.apply(null, rows.map(function (r) { return r.predictedRate; }).concat([mc.rows[0].nullRate])) || 1;
+    var n = rows.length;
+    var bw = (W - pad * 2) / n;
+    function y(v) { return H - pad - (v / maxV) * (H - pad * 2); }
+    var bars = "";
+    for (var i = 0; i < n; i++) {
+      var r = rows[i];
+      var x = pad + i * bw;
+      var lift = r.nullRate > 0 ? r.predictedRate / r.nullRate : 1;
+      var col = lift > 1.3 ? "#12b981" : lift < 0.7 ? "#e65f6a" : "#0b65d8";
+      bars += '<rect x="' + (x + bw * 0.15).toFixed(1) + '" y="' + y(r.predictedRate).toFixed(1) +
+        '" width="' + Math.max(1, bw * 0.7).toFixed(1) +
+        '" height="' + (H - pad - y(r.predictedRate)).toFixed(1) +
+        '" fill="' + col + '" rx="1"><title>' + r.number + ": " + (r.predictedRate * 100).toFixed(1) + "%</title></rect>";
+    }
+    var q = rows[0].nullRate;
+    var qy = y(q);
+    return (
+      '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Predicted rate per number vs null">' +
+      '<line x1="' + pad + '" y1="' + (H - pad) + '" x2="' + (W - pad) + '" y2="' + (H - pad) + '" stroke="#dce4ef"/>' +
+      bars +
+      '<line x1="' + pad + '" y1="' + qy.toFixed(1) + '" x2="' + (W - pad) + '" y2="' + qy.toFixed(1) +
+        '" stroke="#0a7a55" stroke-dasharray="4 3" stroke-width="1.4"/>' +
+      '<text x="' + (W - pad) + '" y="' + (qy - 5).toFixed(1) + '" text-anchor="end" font-size="10" fill="#0a7a55">null ' +
+        (q * 100).toFixed(1) + "%</text>" +
+      '<text x="' + (pad - 6) + '" y="' + (pad + 4) + '" text-anchor="end" font-size="10" fill="#8b99ad">' + (maxV * 100).toFixed(0) + "%</text>" +
+      '<text x="' + (pad - 6) + '" y="' + (H - pad) + '" text-anchor="end" font-size="10" fill="#8b99ad">0</text>' +
+      "</svg>"
+    );
+  }
+
+  function fmtSmall(p) {
+    if (p == null || isNaN(p)) return "—";
+    if (p >= 0.01) return (p * 100).toFixed(2) + "%";
+    if (p >= 1e-4) return (p * 100).toFixed(3) + "%";
+    return p.toExponential(1);
+  }
+
+  function histogram(values, expected) {
+    if (!values || !values.length) return '<div class="empty-state">No recurrence intervals yet.</div>';
+    var max = Math.max.apply(null, values);
+    var bins = Math.min(24, Math.max(6, Math.ceil(max / 2)));
+    var w = max / bins;
+    var counts = new Array(bins).fill(0);
+    values.forEach(function (v) {
+      counts[Math.min(bins - 1, Math.floor(v / w))]++;
+    });
+    var peak = Math.max.apply(null, counts) || 1;
+    var W = 720, H = 180, pad = 28;
+    var bw = (W - pad * 2) / bins;
+
+    var bars = counts.map(function (c, i) {
+      var h = (c / peak) * (H - pad * 2);
+      return (
+        '<rect x="' + (pad + i * bw + 1).toFixed(1) + '" y="' + (H - pad - h).toFixed(1) +
+        '" width="' + (bw - 2).toFixed(1) + '" height="' + h.toFixed(1) +
+        '" fill="#0b65d8" opacity="0.72" rx="2"/>'
+      );
+    }).join("");
+
+    // Geometric reference curve.
+    var q = 1 / expected;
+    var ref = [];
+    for (var i = 0; i < bins; i++) {
+      var g = i * w + w / 2;
+      var dens = Math.pow(1 - q, g - 1) * q * values.length * w;
+      var y = H - pad - (dens / peak) * (H - pad * 2);
+      ref.push((i ? "L" : "M") + (pad + i * bw + bw / 2).toFixed(1) + " " + Math.max(pad, y).toFixed(1));
+    }
+
+    var ex = pad + (expected / max) * (W - pad * 2);
+    return (
+      '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Distribution of gaps between appearances">' +
+      bars +
+      '<path d="' + ref.join(" ") + '" fill="none" stroke="#e65f6a" stroke-width="2" stroke-dasharray="4 3"/>' +
+      '<line x1="' + ex.toFixed(1) + '" y1="' + pad + '" x2="' + ex.toFixed(1) + '" y2="' + (H - pad) +
+        '" stroke="#12b981" stroke-width="1.5"/>' +
+      '<text x="' + (ex + 5).toFixed(1) + '" y="' + (pad + 10) + '" font-size="10" fill="#0a7a55">1/q = ' +
+        expected.toFixed(1) + "</text>" +
+      '<text x="' + (W / 2) + '" y="' + (H - 6) + '" text-anchor="middle" font-size="10" fill="#8b99ad">draws between appearances</text>' +
+      "</svg>" +
+      '<div class="legend" style="margin-top:8px">' +
+        '<span><i class="swatch" style="background:#0b65d8"></i>observed intervals</span>' +
+        '<span><i class="swatch" style="background:#e65f6a"></i>geometric prediction</span>' +
+      "</div>"
+    );
+  }
+
+  /* ---------------- shared: backtest card ---------------- */
+
+  function backtestCard(bt, tool) {
+    if (!bt || !bt.testable) {
+      return card("Out-of-sample validation", "",
+        '<div class="callout is-warn">' + esc(bt && bt.reason ? bt.reason : "Not enough data to validate.") + "</div>");
+    }
+
+    var ev = bt.evidence || {};
+    var via = [];
+    if (ev.logLoss) via.push("log loss (p = " + fmtP(bt.logLossP) + ")");
+    if (ev.topK) via.push("top-" + state.config.picks + " hit rate (p = " + fmtP(bt.hitP) + ")");
+
+    var verdict = bt.beatsChance
+      ? '<div class="callout is-good"><strong>This model beats the uniform baseline on unseen draws.</strong> ' +
+        "Detected by " + via.join(" and ") + ", against a Bonferroni-corrected threshold of 0.025. " +
+        "Mean log loss " + bt.meanLogLoss.toFixed(4) + " versus baseline " + bt.baselineLogLoss.toFixed(4) +
+        ". The improvement is unlikely to be luck.</div>"
+      : '<div class="callout is-danger"><strong>No out-of-sample edge.</strong> ' +
+        "Against draws it never saw, this model does not beat simply assuming every number is " +
+        "equally likely (log loss p = " + fmtP(bt.logLossP) + ", hit rate p = " + fmtP(bt.hitP) +
+        "). Whatever it found in the history does not generalise — " +
+        "which is the outcome to expect from a fair mechanism.</div>";
+
+    return card(
+      "Out-of-sample validation",
+      "Walk-forward: refit on the past, predict the next unseen draw, repeat " + bt.n + " times.",
+      verdict +
+      '<div class="grid-3" style="margin-top:16px">' +
+        metric("Predictive lift", (bt.lift * 100).toFixed(2) + "%",
+          "reduction in log loss vs uniform", bt.lift > 0 ? "is-good" : "is-bad") +
+        metric("Top-" + state.config.picks + " hits", bt.meanTopKHits.toFixed(2),
+          "chance level " + bt.chanceHits.toFixed(2) + " (p = " + fmtP(bt.hitP) + ")",
+          bt.meanTopKHits > bt.chanceHits && bt.hitP < 0.05 ? "is-good" : "") +
+        metric("Brier score", bt.meanBrier.toFixed(5),
+          "baseline " + bt.baselineBrier.toFixed(5) + " — lower is better",
+          bt.meanBrier < bt.baselineBrier ? "is-good" : "is-bad") +
+      "</div>" +
+      hitChart(bt) +
+      '<p class="footnote" style="margin-top:12px"><strong>Why this is the only score that counts.</strong> ' +
+        "Reproducing history is trivial for a flexible model; the test above is the one the " +
+        "principle demands, because each prediction is made against data the model had never seen.</p>"
+    );
+  }
+
+  function hitChart(bt) {
+    var s = bt.hitSeries;
+    if (!s || !s.length) return "";
+    var W = 720, H = 130, pad = 26;
+    var n = s.length;
+    var max = Math.max(state.config.picks, Math.max.apply(null, s)) || 1;
+    var bw = (W - pad * 2) / n;
+    var bars = s.map(function (v, i) {
+      var h = (v / max) * (H - pad * 2);
+      return '<rect x="' + (pad + i * bw + 0.5).toFixed(1) + '" y="' + (H - pad - h).toFixed(1) +
+        '" width="' + Math.max(1, bw - 1).toFixed(1) + '" height="' + h.toFixed(1) +
+        '" fill="' + (v > bt.chanceHits ? "#12b981" : "#c9d4e4") + '" rx="1.5"/>';
+    }).join("");
+    var cy = H - pad - (bt.chanceHits / max) * (H - pad * 2);
+    return (
+      '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Hits per held-out draw">' +
+      bars +
+      '<line x1="' + pad + '" y1="' + cy.toFixed(1) + '" x2="' + (W - pad) + '" y2="' + cy.toFixed(1) +
+        '" stroke="#e65f6a" stroke-dasharray="4 3" stroke-width="1.5"/>' +
+      '<text x="' + (W - pad) + '" y="' + (cy - 5).toFixed(1) + '" text-anchor="end" font-size="10" fill="#b03a45">chance ' +
+        bt.chanceHits.toFixed(2) + "</text>" +
+      "</svg>" +
+      '<p class="chart-caption">Correct numbers inside the model\'s top-' + state.config.picks +
+      " for each held-out draw.</p>"
+    );
+  }
+
+  /* ---------------- helpers ---------------- */
+
+  function card(title, sub, body) {
+    return (
+      '<div class="card"><div class="card-head"><div><h3>' + esc(title) + "</h3>" +
+      (sub ? "<p>" + esc(sub) + "</p>" : "") +
+      "</div></div>" + body + "</div>"
+    );
+  }
+
+  function pct(x) {
+    return (x * 100).toFixed(1) + "%";
+  }
+
+  function fmtP(p) {
+    if (p == null || isNaN(p)) return "—";
+    if (p < 1e-4) return p.toExponential(1);
+    return p.toFixed(4);
+  }
+
+  function esc(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  /* ---------------- export ---------------- */
+
+  function exportReport() {
+    var d = state.diag;
+    var cfg = state.config;
+    var L = [];
+    var rule = "=".repeat(66);
+    L.push(rule);
+    L.push("RECURRENCE LAB REPORT");
+    L.push(new Date().toISOString());
+    L.push(rule, "");
+    L.push("DATA");
+    L.push("  Draws analysed : " + state.parsed.draws.length);
+    L.push("  Rejected rows  : " + state.parsed.rejected.length);
+    L.push("  Structure      : " + cfg.picks + " of " + cfg.poolMin + "-" + cfg.poolMax +
+      " (N=" + cfg.poolSize + ", q=" + (cfg.picks / cfg.poolSize).toFixed(5) + ")");
+    L.push("");
+    L.push("VERDICT: " + (MODE_COPY[d.mode] || {}).title);
+    L.push("  " + (MODE_COPY[d.mode] || {}).body);
+    L.push("");
+    L.push("DIAGNOSTICS");
+    L.push("  Chi-square GOF      : " + d.chi.stat.toFixed(2) + " (df " + d.chi.df + "), p = " + fmtP(d.chi.p));
+    L.push("  Deviating numbers   : " + d.perNumber.fdr.survivors.length + " at FDR 5%");
+    L.push("  Lag-1 autocorr      : " + d.autocorrelation.lag1.toFixed(4) + " (z = " + d.autocorrelation.z.toFixed(2) + ")");
+    L.push("  Stationarity p      : " + (d.stationarity.testable ? fmtP(d.stationarity.p) : "n/a"));
+    L.push("  Entropy ratio       : " + d.entropyRatio.toFixed(4));
+    L.push("  Mean gap            : " + (d.gaps.observedMean || 0).toFixed(2) +
+      " (theory " + d.gaps.expectedMean.toFixed(2) + ")");
+    if (state.tests) {
+      var T = state.tests;
+      L.push("");
+      L.push("STRUCTURE & RANDOMNESS BATTERY");
+      if (T.runs && T.runs.testable) L.push("  Runs test           : z = " + T.runs.z.toFixed(2) + ", p = " + fmtP(T.runs.p));
+      if (T.ks && T.ks.testable) L.push("  KS vs uniform       : D = " + T.ks.stat.toFixed(3) + ", p = " + fmtP(T.ks.p));
+      if (T.spectral && T.spectral.testable) L.push("  Spectral concentration : " + (T.spectral.concentration * 100).toFixed(1) + "%");
+      if (T.poisson) L.push("  Poisson lambda      : " + T.poisson.lambda.toFixed(2) + " expected hits per number");
+    }
+    if (state.envelope) {
+      var EN = state.envelope;
+      L.push("");
+      L.push("MONTE CARLO — OBSERVED vs EXPECTED");
+      L.push("  Replications      : " + EN.replicates + " of " + EN.draws + " draws of " + cfg.picks + " from " + cfg.poolSize);
+      L.push("  Envelope level    : " + Math.round(EN.level * 100) + "%");
+      L.push("  Outside envelope  : " + EN.outsideCount + " of " + EN.rows.length +
+        " numbers (~" + EN.expectedOutside.toFixed(1) + " expected by chance)");
+      L.push("  Reading           : " + EN.interpretation);
+      var flagged = EN.rows.filter(function (r) { return r.outside; }).map(function (r) { return r.number; });
+      if (flagged.length) L.push("  Numbers outside   : " + flagged.join(", "));
+    }
+    if (state.predMC) {
+      var MC = state.predMC;
+      L.push("");
+      L.push("MONTE CARLO — NEXT-DRAW PREDICTION (" + (state.predTool || "model").toUpperCase() + ")");
+      L.push("  Simulated draws   : " + MC.replicates);
+      L.push("  Most likely set   : " + MC.modalSet.join(", "));
+      L.push("  Exact-set prob    : " + fmtSmall(MC.modalSetProb) + "  (any set " + fmtSmall(MC.nullSetProb) + ")");
+      L.push("  Concentration     : " + MC.concentration.toFixed(2) + "x the null set probability");
+      L.push("  Top numbers       : " + MC.topNumbers.map(function (t) { return t.number; }).join(", "));
+    }
+    L.push("");
+
+    ["analytic", "stochastic", "hybrid"].forEach(function (k) {
+      var r = state.results[k];
+      if (!r) return;
+      L.push(rule);
+      L.push("TOOL: " + k.toUpperCase());
+      L.push(rule);
+      if (k === "analytic") {
+        L.push("  Verdict : " + r.model.verdict);
+        if (r.model.best) {
+          L.push("  Law     : " + r.model.best.formula);
+          L.push("  Series  : " + r.model.best.seriesName);
+          L.push("  Held-out accuracy : " + pct(r.model.best.valAccuracy));
+        } else {
+          L.push("  No law survived out-of-sample validation.");
+        }
+        if (r.model.positionLaws && r.model.positionLaws.admissible) {
+          L.push("  Next-draw reconstruction : " + r.model.positionLaws.prediction.join(", "));
+        }
+      }
+      if (k === "stochastic") {
+        L.push("  Prior strength : " + state.stochasticOpts.priorStrength +
+          "   decay : " + state.stochasticOpts.decay);
+        L.push("  Numbers beyond null (FDR 5%) : " + r.model.significantCount);
+        L.push("  Top 10 by posterior probability:");
+        r.model.ranked.slice(0, 10).forEach(function (row) {
+          L.push("    " + String(row.number).padStart(3) + "  seen " + String(row.count).padStart(3) +
+            "  rate " + (row.posteriorMean * 100).toFixed(2) + "%" +
+            "  lift " + row.lift.toFixed(2) + "x" +
+            "  p " + fmtP(row.p) + (row.significant ? "  *" : ""));
+        });
+      }
+      if (k === "hybrid") {
+        L.push("  Learned expert weights:");
+        r.model.experts.forEach(function (e) {
+          L.push("    " + e.name.padEnd(22) + pct(e.weight).padStart(7) +
+            "   mean log loss " + (e.meanLoss == null ? "—" : e.meanLoss.toFixed(4)));
+        });
+        L.push("  Structure share : " + pct(r.model.structureShare));
+      }
+      var bt = r.backtest;
+      L.push("");
+      L.push("  OUT-OF-SAMPLE VALIDATION");
+      if (!bt || !bt.testable) {
+        L.push("    " + (bt && bt.reason ? bt.reason : "not testable"));
+      } else {
+        L.push("    Held-out draws  : " + bt.n);
+        L.push("    Mean log loss   : " + bt.meanLogLoss.toFixed(4) + "  (baseline " + bt.baselineLogLoss.toFixed(4) + ")");
+        L.push("    Predictive lift : " + (bt.lift * 100).toFixed(2) + "%   p = " + fmtP(bt.logLossP));
+        L.push("    Top-k hits      : " + bt.meanTopKHits.toFixed(3) + "  (chance " + bt.chanceHits.toFixed(3) + ")");
+        L.push("    Top-k hit p     : " + fmtP(bt.hitP));
+        L.push("    Beats chance    : " + (bt.beatsChance ? "YES" : "NO") +
+          (bt.evidence ? "  (log-loss test " + (bt.evidence.logLoss ? "fired" : "null") +
+            ", hit-rate test " + (bt.evidence.topK ? "fired" : "null") + ")" : ""));
+      }
+      L.push("");
+    });
+
+    L.push(rule);
+    L.push("GUARDRAILS");
+    L.push("  1. Hypothesis class restricted to explicit assumptions about the process.");
+    L.push("  2. Conclusions are probabilistic, never certain.");
+    L.push("  3. Prior knowledge (sampling without replacement, q = k/N) supplies the");
+    L.push("     inductive bias, reducing what must be learned from data.");
+    L.push("  4. Models are judged only by prediction of unseen draws.");
+    L.push(rule);
+
+    var blob = new Blob([L.join("\n")], { type: "text/plain" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "recurrence-report-" + new Date().toISOString().slice(0, 10) + ".txt";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  /* ---------------- persistence ---------------- */
+
+  function persist() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        text: el.input.value.slice(0, 200000),
+        config: state.config,
+        tool: state.tool,
+        stochasticOpts: state.stochasticOpts
+      }));
+    } catch (e) { /* quota or private mode - non-fatal */ }
+  }
+
+  function restore() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      var s = JSON.parse(raw);
+      if (s.text) el.input.value = s.text;
+      if (s.config) writeConfig(E.normalizeConfig(s.config));
+      if (s.stochasticOpts) state.stochasticOpts = s.stochasticOpts;
+      if (s.tool) state.tool = s.tool;
+    } catch (e) { /* ignore corrupt state */ }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", ready);
+  } else {
+    ready();
+  }
+})();
+
+</script>
+  </body>
+</html>
