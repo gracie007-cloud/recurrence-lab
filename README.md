@@ -34,6 +34,23 @@ Poisson recurrence model, and FFT spectral concentration) adds independent
 evidence about how random the series itself is. These judge structure — they
 never predict a next draw.
 
+## Monte Carlo simulator
+
+Two simulation views make the statistics visible rather than just numeric:
+
+- **Observed vs expected — Monte Carlo envelope.** The null experiment (the
+  observed number of draws of `k` from `N`) is replicated thousands of times to
+  build a 95% envelope around the expected count for each number. The observed
+  counts are laid over that band: a number far outside it deviates from what
+  chance produces, with the explicit caveat that a fair mechanism still throws
+  a few numbers outside by luck. A re-run button draws a fresh simulation.
+- **Next-draw prediction — Monte Carlo.** The currently selected tool's fitted
+  probability vector is sampled thousands of times to show (a) the predicted
+  appearance rate per number against the null line, and (b) the most likely
+  next set together with its exact-set probability against the `1 / C(N, k)`
+  any set carries. This is always framed as a **distribution, never a promise** —
+  on a fair mechanism the model spreads probability near-evenly and says so.
+
 ## Guardrails
 
 These are enforced in code, not just in prose:
@@ -80,6 +97,11 @@ The engine is exercised by an automated honesty suite:
   held-out accuracy.
 - The KS test is calibrated against its own permutation null (the classical
   asymptotic p-value is badly anti-conservative on discrete uniform data).
+- The Monte Carlo envelope is calibrated: ~2–5% of numbers sit outside a 95%
+  envelope on pure chance (the chance rate), while planted bias is flagged and
+  the deterministic law's predicted set is recovered exactly. On noise the
+  prediction simulator shows no meaningful concentration (top-number lift near
+  1×), which is the honest answer.
 
 ## Provenance
 

@@ -15,6 +15,7 @@
     results: {},
     config: E.normalizeConfig({}),
     stochasticOpts: { priorStrength: 40, decay: 1.0 },
+    mcSeed: 20260731,
     running: false
   };
 
@@ -240,6 +241,7 @@
       ["Testing against the null…", function () {
         state.diag = E.diagnostics(draws, cfg);
         state.tests = E.structureTests(draws, cfg);
+        state.envelope = E.monteCarloEnvelope(draws, cfg, { seed: state.mcSeed });
       }],
       ["Searching for a law…", function () {
         state.results.analytic = {
@@ -291,6 +293,10 @@
             : "stochastic";
           state.recommended = recommend;
           state.tool = recommend;
+          // Monte Carlo next-draw simulation from the recommended model.
+          var probs = E.scorerFor(recommend, cfg, state.stochasticOpts)(draws);
+          state.predMC = E.predictionMonteCarlo(probs, cfg, { seed: state.mcSeed });
+          state.predTool = recommend;
           render();
           persist();
         } catch (err) {
@@ -333,7 +339,32 @@
     renderStochastic();
     renderHybrid();
     selectTool(state.tool);
+    renderPredictionMC();
     $("btnExport").disabled = false;
+  }
+
+  // Monte Carlo next-draw card sits below the tool panels and reflects the
+  // currently selected tool's model.
+  function renderPredictionMC() {
+    var host = $("predictionHost");
+    if (!host) return;
+    if (!state.predMC) { host.hidden = true; host.innerHTML = ""; return; }
+    host.hidden = false;
+    host.innerHTML = predictionMonteCarloCard();
+    var btn = $("btnResim");
+    if (btn) btn.addEventListener("click", resimulate);
+  }
+
+  function resimulate() {
+    if (!state.parsed || !state.parsed.draws.length) return;
+    state.mcSeed = (state.mcSeed * 1664525 + 1013904223) >>> 0;
+    var draws = state.parsed.draws;
+    var cfg = state.config;
+    state.envelope = E.monteCarloEnvelope(draws, cfg, { seed: state.mcSeed });
+    var probs = E.scorerFor(state.predTool || state.recommended || "stochastic", cfg, state.stochasticOpts)(draws);
+    state.predMC = E.predictionMonteCarlo(probs, cfg, { seed: state.mcSeed });
+    renderStochastic();
+    renderPredictionMC();
   }
 
   /* ---------------- verdict ---------------- */
@@ -529,6 +560,13 @@
 
   function selectTool(tool) {
     state.tool = tool;
+    // Keep the Monte Carlo next-draw simulation on the selected tool's model.
+    if (state.parsed && state.parsed.draws.length && state.results[tool]) {
+      var cfg = state.config;
+      var probs = E.scorerFor(tool, cfg, state.stochasticOpts)(state.parsed.draws);
+      state.predMC = E.predictionMonteCarlo(probs, cfg, { seed: state.mcSeed });
+      state.predTool = tool;
+    }
     Array.prototype.forEach.call(document.querySelectorAll(".tool-tab"), function (t) {
       var on = t.getAttribute("data-tool") === tool;
       t.classList.toggle("is-active", on);
@@ -552,6 +590,7 @@
         f.textContent = "Available";
       }
     });
+    renderPredictionMC();
     persist();
   }
 
@@ -742,6 +781,7 @@
         "Beta-Binomial posterior per number, prior centred on the hypergeometric rate q = k/N.",
         controls + head) +
       card("Per-number posterior", "Ranked by predictive probability for the next draw. Top 15 shown.", table) +
+      monteCarloEnvelopeCard() +
       gapCard +
       backtestCard(bt, "stochastic");
 
@@ -884,6 +924,181 @@
       paths +
       "</svg>"
     );
+  }
+
+  /* ---------------- Monte Carlo: observed vs expected ---------------- */
+
+  function monteCarloEnvelopeCard() {
+    var env = state.envelope;
+    if (!env) return "";
+    var interp = env.outsideCount <= Math.ceil(env.expectedOutside * 2)
+      ? '<div class="callout is-good"><strong>Consistent with chance.</strong> ' +
+        env.outsideCount + " of " + env.rows.length + " numbers sit outside the " + Math.round(env.level * 100) +
+        "% Monte Carlo envelope — about what a fair mechanism throws off by luck (~" +
+        env.expectedOutside.toFixed(1) + ")." + "</div>"
+      : '<div class="callout is-warn"><strong>More structure than chance explains.</strong> ' +
+        env.outsideCount + " of " + env.rows.length + " numbers sit outside the " + Math.round(env.level * 100) +
+        "% envelope, well beyond the ~" + env.expectedOutside.toFixed(1) + " expected from a fair mechanism. " +
+        "The mechanism is unlikely to be uniform.</div>";
+
+    return card(
+      "Observed vs expected — Monte Carlo envelope",
+      env.replicates.toLocaleString() + " null replications of " + env.draws + " draws of " +
+        state.config.picks + " from " + state.config.poolSize + ". Bars are observed counts; " +
+        "the band is the " + Math.round(env.level * 100) + "% envelope chance produces.",
+      envelopeChart(env) +
+      '<div class="legend" style="margin-top:8px">' +
+        '<span><i class="swatch" style="background:#0b65d8"></i>observed count</span>' +
+        '<span><i class="swatch" style="background:#e65f6a"></i>outside envelope</span>' +
+        '<span><i class="swatch" style="background:#c9d4e4"></i>' + Math.round(env.level * 100) + "% envelope</span>" +
+      "</div>" +
+      '<div style="margin-top:14px">' + interp + "</div>"
+    );
+  }
+
+  function envelopeChart(env) {
+    var rows = env.rows;
+    var W = 720, H = 220, pad = 34;
+    var maxV = Math.max.apply(null, rows.map(function (r) {
+      return Math.max(r.observed, r.envelopeHi);
+    })) || 1;
+    var n = rows.length;
+    var bw = (W - pad * 2) / n;
+    function y(v) { return H - pad - (v / maxV) * (H - pad * 2); }
+
+    var bands = "";
+    var bars = "";
+    var labels = "";
+    for (var i = 0; i < n; i++) {
+      var r = rows[i];
+      var x = pad + i * bw;
+      var cx = x + bw / 2;
+      // envelope band
+      bands += '<rect x="' + x.toFixed(1) + '" y="' + y(r.envelopeHi).toFixed(1) +
+        '" width="' + Math.max(1, bw - 1).toFixed(1) +
+        '" height="' + (y(r.envelopeLo) - y(r.envelopeHi)).toFixed(1) +
+        '" fill="#c9d4e4" opacity="0.45"/>';
+      // observed bar, red if outside
+      var outside = r.observed < r.envelopeLo || r.observed > r.envelopeHi;
+      bars += '<rect x="' + (x + bw * 0.2).toFixed(1) + '" y="' + y(r.observed).toFixed(1) +
+        '" width="' + Math.max(1, bw * 0.6).toFixed(1) +
+        '" height="' + (H - pad - y(r.observed)).toFixed(1) +
+        '" fill="' + (outside ? "#e65f6a" : "#0b65d8") + '" rx="1"/>';
+      if (n <= 60 && (i % Math.ceil(n / 24) === 0)) {
+        labels += '<text x="' + cx.toFixed(1) + '" y="' + (H - pad + 14) +
+          '" text-anchor="middle" font-size="8.5" fill="#8b99ad">' + r.number + "</text>";
+      }
+    }
+    var ey = y(env.expectedCount);
+    return (
+      '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Observed counts vs Monte Carlo envelope">' +
+      '<line x1="' + pad + '" y1="' + (H - pad) + '" x2="' + (W - pad) + '" y2="' + (H - pad) + '" stroke="#dce4ef"/>' +
+      bands + bars +
+      '<line x1="' + pad + '" y1="' + ey.toFixed(1) + '" x2="' + (W - pad) + '" y2="' + ey.toFixed(1) +
+        '" stroke="#0a7a55" stroke-dasharray="4 3" stroke-width="1.4"/>' +
+      '<text x="' + (W - pad) + '" y="' + (ey - 5).toFixed(1) + '" text-anchor="end" font-size="10" fill="#0a7a55">expected ' +
+        env.expectedCount.toFixed(1) + "</text>" +
+      labels +
+      '<text x="' + (pad - 6) + '" y="' + (pad + 4) + '" text-anchor="end" font-size="10" fill="#8b99ad">' + maxV + "</text>" +
+      '<text x="' + (pad - 6) + '" y="' + (H - pad) + '" text-anchor="end" font-size="10" fill="#8b99ad">0</text>' +
+      "</svg>"
+    );
+  }
+
+  /* ---------------- Monte Carlo: prediction pattern + next set ---------------- */
+
+  function predictionMonteCarloCard() {
+    var mc = state.predMC;
+    if (!mc) return "";
+    var toolName = { analytic: "Analytic derivation", stochastic: "Stochastic recurrence", hybrid: "Hybrid ensemble" }[state.predTool] || "Model";
+    var k = state.config.picks;
+    var N = state.config.poolSize;
+    var top = mc.topNumbers;
+
+    var ratesChart = predictionRatesChart(mc);
+
+    var nextSet =
+      '<div class="prediction-row">' +
+        mc.modalSet.map(function (n) {
+          return '<div class="pred-ball">' + n + "</div>";
+        }).join("") +
+      "</div>";
+
+    var framing =
+      mc.concentration > 2
+        ? '<div class="callout is-warn"><strong>The model concentrates probability.</strong> Its most likely exact set is ' +
+          fmtSmall(mc.modalSetProb) + " — about " + mc.concentration.toFixed(1) + "× the " + fmtSmall(mc.nullSetProb) +
+          " a random set carries. That is real structure <em>if the model is right</em>; it is still one set out of " +
+          Number(mc.totalSets).toLocaleString(undefined, { maximumFractionDigits: 0 }) + " possible.</div>"
+        : '<div class="callout"><strong>The model spreads probability near-evenly.</strong> Its most likely exact set is ' +
+          fmtSmall(mc.modalSetProb) + ", close to the " + fmtSmall(mc.nullSetProb) +
+          " any random set carries — which is what an honest model says when the mechanism is near-fair. " +
+          "No set is meaningfully more likely than another.</div>";
+
+    return card(
+      "Next-draw prediction — Monte Carlo",
+      mc.replicates.toLocaleString() + " simulated next draws from the " + esc(toolName) +
+        " probability vector. A distribution, not a promise. " +
+        '<button class="chip-button" type="button" id="btnResim" style="float:right">Re-run simulation</button>',
+      '<div class="grid-3" style="margin-bottom:16px">' +
+        metric("Top predicted number", String(top[0].number),
+          (top[0].predictedRate * 100).toFixed(1) + "% vs null " + (top[0].nullRate * 100).toFixed(1) + "% (" +
+          top[0].lift.toFixed(2) + "×)", Math.abs(top[0].lift - 1) < 0.2 ? "" : "is-warn") +
+        metric("Exact-set probability", fmtSmall(mc.modalSetProb),
+          "modal set vs " + fmtSmall(mc.nullSetProb) + " for any set", "") +
+        metric("Possible sets", Number(mc.totalSets).toLocaleString(undefined, { maximumFractionDigits: 0 }),
+          "C(" + N + ", " + k + ") combinations", "") +
+      "</div>" +
+      "<h4 style=\"font-size:0.85rem;margin-bottom:10px\">Predicted rate per number vs null</h4>" +
+      ratesChart +
+      "<h4 style=\"font-size:0.85rem;margin:18px 0 10px\">Most likely next set (top " + k + " by model probability)</h4>" +
+      nextSet +
+      '<p class="hint" style="margin-top:12px">Highest per-number rate ' + (top[0].predictedRate * 100).toFixed(1) +
+        "% versus null " + (top[0].nullRate * 100).toFixed(1) + "%. " +
+        (Math.abs(top[0].lift - 1) < 0.2 ? "Within noise — treat as a ranking, not an edge." : "") + "</p>" +
+      '<div style="margin-top:14px">' + framing + "</div>"
+    );
+  }
+
+  function predictionRatesChart(mc) {
+    var rows = mc.rows;
+    var W = 720, H = 180, pad = 30;
+    var maxV = Math.max.apply(null, rows.map(function (r) { return r.predictedRate; }).concat([mc.rows[0].nullRate])) || 1;
+    var n = rows.length;
+    var bw = (W - pad * 2) / n;
+    function y(v) { return H - pad - (v / maxV) * (H - pad * 2); }
+    var bars = "";
+    for (var i = 0; i < n; i++) {
+      var r = rows[i];
+      var x = pad + i * bw;
+      var lift = r.nullRate > 0 ? r.predictedRate / r.nullRate : 1;
+      var col = lift > 1.3 ? "#12b981" : lift < 0.7 ? "#e65f6a" : "#0b65d8";
+      bars += '<rect x="' + (x + bw * 0.15).toFixed(1) + '" y="' + y(r.predictedRate).toFixed(1) +
+        '" width="' + Math.max(1, bw * 0.7).toFixed(1) +
+        '" height="' + (H - pad - y(r.predictedRate)).toFixed(1) +
+        '" fill="' + col + '" rx="1"><title>' + r.number + ": " + (r.predictedRate * 100).toFixed(1) + "%</title></rect>";
+    }
+    var q = rows[0].nullRate;
+    var qy = y(q);
+    return (
+      '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Predicted rate per number vs null">' +
+      '<line x1="' + pad + '" y1="' + (H - pad) + '" x2="' + (W - pad) + '" y2="' + (H - pad) + '" stroke="#dce4ef"/>' +
+      bars +
+      '<line x1="' + pad + '" y1="' + qy.toFixed(1) + '" x2="' + (W - pad) + '" y2="' + qy.toFixed(1) +
+        '" stroke="#0a7a55" stroke-dasharray="4 3" stroke-width="1.4"/>' +
+      '<text x="' + (W - pad) + '" y="' + (qy - 5).toFixed(1) + '" text-anchor="end" font-size="10" fill="#0a7a55">null ' +
+        (q * 100).toFixed(1) + "%</text>" +
+      '<text x="' + (pad - 6) + '" y="' + (pad + 4) + '" text-anchor="end" font-size="10" fill="#8b99ad">' + (maxV * 100).toFixed(0) + "%</text>" +
+      '<text x="' + (pad - 6) + '" y="' + (H - pad) + '" text-anchor="end" font-size="10" fill="#8b99ad">0</text>' +
+      "</svg>"
+    );
+  }
+
+  function fmtSmall(p) {
+    if (p == null || isNaN(p)) return "—";
+    if (p >= 0.01) return (p * 100).toFixed(2) + "%";
+    if (p >= 1e-4) return (p * 100).toFixed(3) + "%";
+    return p.toExponential(1);
   }
 
   function histogram(values, expected) {
@@ -1072,6 +1287,28 @@
       if (T.ks && T.ks.testable) L.push("  KS vs uniform       : D = " + T.ks.stat.toFixed(3) + ", p = " + fmtP(T.ks.p));
       if (T.spectral && T.spectral.testable) L.push("  Spectral concentration : " + (T.spectral.concentration * 100).toFixed(1) + "%");
       if (T.poisson) L.push("  Poisson lambda      : " + T.poisson.lambda.toFixed(2) + " expected hits per number");
+    }
+    if (state.envelope) {
+      var EN = state.envelope;
+      L.push("");
+      L.push("MONTE CARLO — OBSERVED vs EXPECTED");
+      L.push("  Replications      : " + EN.replicates + " of " + EN.draws + " draws of " + cfg.picks + " from " + cfg.poolSize);
+      L.push("  Envelope level    : " + Math.round(EN.level * 100) + "%");
+      L.push("  Outside envelope  : " + EN.outsideCount + " of " + EN.rows.length +
+        " numbers (~" + EN.expectedOutside.toFixed(1) + " expected by chance)");
+      L.push("  Reading           : " + EN.interpretation);
+      var flagged = EN.rows.filter(function (r) { return r.outside; }).map(function (r) { return r.number; });
+      if (flagged.length) L.push("  Numbers outside   : " + flagged.join(", "));
+    }
+    if (state.predMC) {
+      var MC = state.predMC;
+      L.push("");
+      L.push("MONTE CARLO — NEXT-DRAW PREDICTION (" + (state.predTool || "model").toUpperCase() + ")");
+      L.push("  Simulated draws   : " + MC.replicates);
+      L.push("  Most likely set   : " + MC.modalSet.join(", "));
+      L.push("  Exact-set prob    : " + fmtSmall(MC.modalSetProb) + "  (any set " + fmtSmall(MC.nullSetProb) + ")");
+      L.push("  Concentration     : " + MC.concentration.toFixed(2) + "x the null set probability");
+      L.push("  Top numbers       : " + MC.topNumbers.map(function (t) { return t.number; }).join(", "));
     }
     L.push("");
 
