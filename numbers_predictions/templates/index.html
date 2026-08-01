@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Numbers Predictions Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --bg: #0d1117;
+            --surface: #161b22;
+            --border: #30363d;
+            --text: #e6edf3;
+            --text-dim: #8b949e;
+            --accent: #1a7431;
+            --accent-hover: #2a9444;
+            --blue: #1f6feb;
+            --purple: #8957e5;
+            --orange: #d29922;
+            --red: #da3633;
+            --radius: 8px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        header h1 {
+            font-size: 1.4rem;
+            font-weight: 600;
+        }
+        header .subtitle {
+            color: var(--text-dim);
+            font-size: 0.85rem;
+            margin-top: 2px;
+        }
+        .badge {
+            background: var(--accent);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+        .info-bar {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px 20px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .info-label {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .info-value {
+            font-size: 1rem;
+            font-weight: 600;
+        }
+        .info-value .number-pill {
+            display: inline-block;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            padding: 2px 10px;
+            border-radius: 4px;
+            margin: 0 2px;
+            font-family: 'Courier New', monospace;
+        }
+        .tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 24px;
+            border-bottom: 2px solid var(--border);
+        }
+        .tab {
+            padding: 12px 24px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            color: var(--text-dim);
+            font-size: 0.95rem;
+            font-weight: 500;
+            position: relative;
+            transition: color 0.2s;
+        }
+        .tab:hover { color: var(--text); }
+        .tab.active { color: var(--text); }
+        .tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--accent);
+        }
+        .tab-icon {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        .panel { display: none; }
+        .panel.active { display: block; }
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .card h3 {
+            font-size: 1.1rem;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .controls {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+            align-items: flex-end;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .control-group label {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+        }
+        .control-group input, .control-group select, .control-group textarea {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-family: inherit;
+        }
+        .control-group textarea {
+            min-width: 300px;
+            min-height: 60px;
+            resize: vertical;
+        }
+        .btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        .btn:hover { background: var(--accent-hover); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn.secondary {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+        .btn.secondary:hover { border-color: var(--accent); }
+        .chart-container {
+            position: relative;
+            height: 350px;
+            margin-bottom: 16px;
+        }
+        .chart-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 900px) {
+            .chart-grid { grid-template-columns: 1fr; }
+        }
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+        }
+        .results-table th, .results-table td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.85rem;
+        }
+        .results-table th {
+            color: var(--text-dim);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+        }
+        .results-table tr:hover { background: rgba(255,255,255,0.03); }
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-top: 12px;
+        }
+        .stat-box {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 12px;
+        }
+        .stat-box .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+        }
+        .stat-box .stat-value {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-top: 4px;
+        }
+        .formula-box {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 12px;
+            margin-top: 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+        }
+        .formula-box .formula-name {
+            color: var(--accent);
+            font-weight: bold;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+            color: var(--text-dim);
+        }
+        .loading.show { display: block; }
+        .spinner {
+            border: 3px solid var(--border);
+            border-top: 3px solid var(--accent);
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 12px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .prediction-display {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+        .prediction-ball {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.1rem;
+            border: 2px solid var(--accent-hover);
+        }
+        .prediction-ball.stochastic { background: var(--blue); border-color: #388bfd; }
+        .prediction-ball.combined { background: var(--purple); border-color: #a371f7; }
+        .prediction-ball.det { background: var(--orange); border-color: #e3b341; }
+        .score-bar-container {
+            background: var(--bg);
+            border-radius: 4px;
+            height: 24px;
+            overflow: hidden;
+            position: relative;
+            margin-top: 8px;
+        }
+        .score-bar {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+        .score-bar.det { background: var(--orange); }
+        .score-bar.stoch { background: var(--blue); }
+        .score-label {
+            position: absolute;
+            top: 0;
+            left: 8px;
+            line-height: 24px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: white;
+        }
+        .alert {
+            background: rgba(218, 54, 51, 0.1);
+            border: 1px solid var(--red);
+            border-radius: 4px;
+            padding: 12px;
+            margin-top: 12px;
+            color: #ff7b72;
+            font-size: 0.85rem;
+        }
+        .section-title {
+            font-size: 0.9rem;
+            color: var(--text-dim);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .formula-ref {
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            background: var(--bg);
+            padding: 2px 6px;
+            border-radius: 3px;
+            border: 1px solid var(--border);
+        }
+        .footer {
+            text-align: center;
+            padding: 24px;
+            color: var(--text-dim);
+            font-size: 0.8rem;
+            border-top: 1px solid var(--border);
+            margin-top: 40px;
+        }
+        .toggle-group {
+            display: flex;
+            gap: 0;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .toggle-btn {
+            padding: 6px 16px;
+            cursor: pointer;
+            background: var(--bg);
+            border: none;
+            color: var(--text-dim);
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+        .toggle-btn.active {
+            background: var(--accent);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div>
+            <h1>🎯 Numbers Predictions Dashboard</h1>
+            <div class="subtitle">Future Recurrence Determined Law — Three Interchangeable Prediction Tools</div>
+        </div>
+        <span class="badge">S = &#123;3, 10, 13, 15, 17, 33, 37, 46&#125;</span>
+    </header>
+
+    <div class="container">
+        <!-- Info Bar -->
+        <div class="info-bar">
+            <div class="info-item">
+                <span class="info-label">Target Set</span>
+                <span class="info-value">
+                    <span class="number-pill">3</span><span class="number-pill">10</span><span class="number-pill">13</span><span class="number-pill">15</span><span class="number-pill">17</span><span class="number-pill">33</span><span class="number-pill">37</span><span class="number-pill">46</span>
+                </span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Phase Space</span>
+                <span class="info-value">Z<sub>46</sub> = &#123;0, 1, ..., 45&#125;</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Elements</span>
+                <span class="info-value">N = 8</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Methodology</span>
+                <span class="info-value">Probabilistic Recurrence Prediction</span>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('analytic')">
+                <span class="tab-icon" style="background: var(--orange)"></span>
+                Pattern Detected — Analytic Law
+            </button>
+            <button class="tab" onclick="switchTab('stochastic')">
+                <span class="tab-icon" style="background: var(--blue)"></span>
+                No Pattern — Stochastic Model
+            </button>
+            <button class="tab" onclick="switchTab('hybrid')">
+                <span class="tab-icon" style="background: var(--purple)"></span>
+                Mixed Pattern — Hybrid Model
+            </button>
+        </div>
+
+        <!-- ============ TOOL 1: ANALYTIC ============ -->
+        <div id="panel-analytic" class="panel active">
+            <div class="card">
+                <h3>🔧 Analytic Derivation of Generating Law</h3>
+                <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 16px">
+                    When structure is detected in the data, derive the deterministic generating law. Uses recurrence mapping,
+                    redistribution kernels, and the master formula from the document.
+                </p>
+                <div class="controls">
+                    <div class="control-group">
+                        <label>Time Horizon (t_max)</label>
+                        <input type="number" id="ana-t-max" value="20" min="1" max="100">
+                    </div>
+                    <div class="control-group">
+                        <label>α (alpha)</label>
+                        <input type="number" id="ana-alpha" value="1.0" step="0.1" min="0.1">
+                    </div>
+                    <div class="control-group">
+                        <label>ω (omega)</label>
+                        <input type="number" id="ana-omega" value="1.0" step="0.1" min="0.1">
+                    </div>
+                    <div class="control-group">
+                        <label>γ (gamma)</label>
+                        <input type="number" id="ana-gamma" value="0.5" step="0.1" min="0.1">
+                    </div>
+                    <div class="control-group">
+                        <label>H (horizon base)</label>
+                        <input type="number" id="ana-H" value="2.0" step="0.5" min="1.1">
+                    </div>
+                    <button class="btn" onclick="runAnalytic()">Generate Sequence</button>
+                </div>
+                <div class="formula-box">
+                    <div><span class="formula-name">T(t)</span> = t^t for t ≥ 1</div>
+                    <div><span class="formula-name">R(t)</span> = Σ<sub>s∈S</sub> s · 𝟙&#123;⌊T(t)⌋ mod 46 = s&#125;</div>
+                    <div><span class="formula-name">X<sub>n,t</sub></span> = A<sub>B(⌊n^α + ωt^γ⌋ mod P)</sub></div>
+                    <div><span class="formula-name">N(t)</span> = ⌈H^(t^γ)⌉</div>
+                    <div><span class="formula-name">p<sub>i</sub>(t)</span> = (1/N(t)) Σ<sub>n=0</sub><sup>N(t)-1</sup> 𝟙[X<sub>n,t</sub> = A<sub>i</sub>]</div>
+                </div>
+            </div>
+
+            <div id="analytic-results" style="display:none">
+            <div class="chart-grid">
+                <div class="card">
+                    <h3>Recurrence Sequence R(t)</h3>
+                    <div class="chart-container"><canvas id="chart-sequence"></canvas></div>
+                </div>
+                <div class="card">
+                    <h3>Long-Run Distribution p<sub>i</sub><sup>∞</sup></h3>
+                    <div class="chart-container"><canvas id="chart-longrun"></canvas></div>
+                </div>
+            </div>
+            <div class="card">
+                <h3>Recurrence Distribution p<sub>i</sub>(t) Over Time</h3>
+                <div class="chart-container" style="height:400px"><canvas id="chart-distributions"></canvas></div>
+            </div>
+            <div class="card">
+                <h3>Recurrence Sequence Table</h3>
+                <table class="results-table" id="table-sequence">
+                    <thead><tr><th>t</th><th>T(t)</th><th>R(t)</th><th>⌊T(t)⌋ mod 46</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            </div>
+            <div id="analytic-loading" class="loading">
+                <div class="spinner"></div>
+                Computing recurrence sequences and distributions...
+            </div>
+        </div>
+
+        <!-- ============ TOOL 2: STOCHASTIC ============ -->
+        <div id="panel-stochastic" class="panel">
+            <div class="card">
+                <h3>📊 Statistical/Stochastic Model of Recurrence Frequency</h3>
+                <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 16px">
+                    When no deterministic pattern is found, use probability laws to predict expected frequencies.
+                    Monte Carlo simulation, Markov chains, Poisson processes, and Law of Large Numbers convergence.
+                </p>
+                <div class="controls">
+                    <div class="control-group">
+                        <label>Historical Draws (comma-separated)</label>
+                        <textarea id="stoch-draws" placeholder="e.g. 3,10,17,46,15,33,3,10,13,37,17,15,46,33,10,3,37,13,15,17">3,10,17,46,15,33,3,10,13,37,17,15,46,33,10,3,37,13,15,17,33,46,10,3,15,37,13,17,33,46,10,3,15,37,13,17,33,46,10</textarea>
+                    </div>
+                </div>
+                <div class="controls">
+                    <div class="control-group">
+                        <label>Monte Carlo Draws</label>
+                        <input type="number" id="stoch-mc-draws" value="1000" min="10">
+                    </div>
+                    <div class="control-group">
+                        <label>MC Simulations</label>
+                        <input type="number" id="stoch-mc-sims" value="5000" min="100">
+                    </div>
+                    <button class="btn" onclick="runStochastic()">Run All Stochastic Analyses</button>
+                </div>
+                <div class="formula-box">
+                    <div><span class="formula-name">E[C<sub>i</sub>(N)]</span> = N · p<sub>i</sub>, uniform → N/8</div>
+                    <div><span class="formula-name">LLN</span>: lim<sub>N→∞</sub> freq<sub>i</sub>(N) → p<sub>i</sub></div>
+                    <div><span class="formula-name">CLT</span>: m ≥ σ²/ε² for ε-accuracy</div>
+                </div>
+            </div>
+
+            <div id="stochastic-results" style="display:none">
+            <div class="chart-grid">
+                <div class="card">
+                    <h3>Monte Carlo: Observed vs Expected Counts</h3>
+                    <div class="chart-container"><canvas id="chart-mc"></canvas></div>
+                </div>
+                <div class="card">
+                    <h3>Frequency Analysis (Observed vs Expected)</h3>
+                    <div class="chart-container"><canvas id="chart-freq"></canvas></div>
+                </div>
+            </div>
+            <div class="chart-grid">
+                <div class="card">
+                    <h3>Poisson Process: Recurrence Time Distribution</h3>
+                    <div class="chart-container"><canvas id="chart-poisson"></canvas></div>
+                </div>
+                <div class="card">
+                    <h3>Law of Large Numbers Convergence</h3>
+                    <div class="chart-container"><canvas id="chart-lln"></canvas></div>
+                </div>
+            </div>
+            <div class="card">
+                <h3>Randomness Tests</h3>
+                <div id="stoch-randomness"></div>
+            </div>
+            <div class="chart-grid">
+                <div class="card">
+                    <h3>Markov Chain Transitions (Top targets from target set values)</h3>
+                    <div id="stoch-markov"></div>
+                </div>
+                <div class="card">
+                    <h3>Statistical Summary</h3>
+                    <div id="stoch-summary"></div>
+                </div>
+            </div>
+            </div>
+            <div id="stochastic-loading" class="loading">
+                <div class="spinner"></div>
+                Running Monte Carlo, Markov, Poisson, and randomness tests...
+            </div>
+        </div>
+
+        <!-- ============ TOOL 3: HYBRID ============ -->
+        <div id="panel-hybrid" class="panel">
+            <div class="card">
+                <h3>🔬 Hybrid Model — Pattern Detection + Stochastic Residual</h3>
+                <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 16px">
+                    When data exhibits both deterministic structure and stochastic noise, combine analytic derivation
+                    with statistical modeling. Includes adaptive learning (multiplicative weights) and game-theoretic analysis.
+                </p>
+                <div class="controls">
+                    <div class="control-group">
+                        <label>Historical Draws (comma-separated)</label>
+                        <textarea id="hyb-draws" placeholder="e.g. 3,10,17,46,15,33,3,10,13,37">3,10,17,46,15,33,3,10,13,37,17,15,46,33,10,3,37,13,15,17,33,46,10,3,15,37,13,17,33,46,10,3,15,37,13,17,33,46,10</textarea>
+                    </div>
+                </div>
+                <div class="controls">
+                    <div class="control-group">
+                        <label>Number of Predictions</label>
+                        <input type="number" id="hyb-n-pred" value="10" min="1" max="50">
+                    </div>
+                    <div class="control-group">
+                        <label>Learning Rate (adaptive)</label>
+                        <input type="number" id="hyb-lr" value="0.1" step="0.01" min="0.01" max="1.0">
+                    </div>
+                    <button class="btn" onclick="runHybrid()">Run Hybrid Analysis</button>
+                </div>
+                <div class="formula-box">
+                    <div><span class="formula-name">Score</span> = weighted(det_pattern, spectral_energy, autocorr)</div>
+                    <div><span class="formula-name">Adaptive</span>: w<sub>i</sub>(t+1) = w<sub>i</sub>(t) · (1 - η · loss)</div>
+                    <div><span class="formula-name">Game Theory</span>: Fictitious play + Replicator dynamics</div>
+                </div>
+            </div>
+
+            <div id="hybrid-results" style="display:none">
+            <div class="card">
+                <h3>Deterministic vs Stochastic Score</h3>
+                <div id="hyb-score-display"></div>
+            </div>
+            <div class="card">
+                <h3>Hybrid Predictions</h3>
+                <div id="hyb-predictions"></div>
+            </div>
+            <div class="chart-grid">
+                <div class="card">
+                    <h3>Pattern Detection: Modular Arithmetic</h3>
+                    <div class="chart-container"><canvas id="chart-modular"></canvas></div>
+                </div>
+                <div class="card">
+                    <h3>Spectral Analysis (FFT)</h3>
+                    <div class="chart-container"><canvas id="chart-spectral"></canvas></div>
+                </div>
+            </div>
+            <div class="chart-grid">
+                <div class="card">
+                    <h3>Adaptive Learning: Target Set Probabilities</h3>
+                    <div class="chart-container"><canvas id="chart-adaptive"></canvas></div>
+                </div>
+                <div class="card">
+                    <h3>Game-Theoretic: Empirical Frequencies</h3>
+                    <div class="chart-container"><canvas id="chart-game"></canvas></div>
+                </div>
+            </div>
+            <div class="card">
+                <h3>Pattern Detection Details</h3>
+                <div id="hyb-patterns"></div>
+            </div>
+            </div>
+            <div id="hybrid-loading" class="loading">
+                <div class="spinner"></div>
+                Detecting patterns, running adaptive learning, and game-theoretic analysis...
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        Numbers Predictions Dashboard — Future Recurrence Determined Law Methodology<br>
+        Based on: Law of Large Numbers · Non-Stationary Stochastic Processes · Statistical Learning Theory · Adaptive/Online Learning
+    </div>
+
+<script>
+// ========== State ==========
+const charts = {};
+const TARGET_SET = [3, 10, 13, 15, 17, 33, 37, 46];
+const COLORS = ['#d29922', '#1f6feb', '#8957e5', '#2ea043', '#da3633', '#f0883e', '#39c5cf', '#bf3989'];
+const API_BASE = '';
+
+// ========== Tab Switching ==========
+function switchTab(tool) {
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('panel-' + tool).classList.add('active');
+    event.target.closest('.tab').classList.add('active');
+}
+
+// ========== API Helper ==========
+async function apiCall(endpoint, body) {
+    const resp = await fetch(API_BASE + endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    });
+    if (!resp.ok) {
+        const err = await resp.json();
+        throw new Error(err.error || 'API Error');
+    }
+    return resp.json();
+}
+
+// ========== Destroy Chart Helper ==========
+function destroyChart(id) {
+    if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+// ========== TOOL 1: Analytic ==========
+async function runAnalytic() {
+    const tMax = parseInt(document.getElementById('ana-t-max').value);
+    const alpha = parseFloat(document.getElementById('ana-alpha').value);
+    const omega = parseFloat(document.getElementById('ana-omega').value);
+    const gamma = parseFloat(document.getElementById('ana-gamma').value);
+    const H = parseFloat(document.getElementById('ana-H').value);
+
+    document.getElementById('analytic-results').style.display = 'none';
+    document.getElementById('analytic-loading').classList.add('show');
+
+    try {
+        const data = await apiCall('/api/analytic/generate', { t_max: tMax, alpha, omega, gamma, H });
+        document.getElementById('analytic-loading').classList.remove('show');
+        document.getElementById('analytic-results').style.display = 'block';
+
+        // Sequence Chart
+        destroyChart('chart-sequence');
+        const seqLabels = data.sequence.map(s => 't=' + s.t);
+        const seqData = data.sequence.map(s => s['R(t)'] !== null ? s['R(t)'] : 0);
+        const seqColors = data.sequence.map(s => s['R(t)'] !== null ? '#d29922' : '#30363d');
+        charts['chart-sequence'] = new Chart(document.getElementById('chart-sequence'), {
+            type: 'bar',
+            data: { labels: seqLabels, datasets: [{ label: 'R(t)', data: seqData, backgroundColor: seqColors, borderRadius: 4 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, ticks: { color: '#8b949e' } }, x: { ticks: { color: '#8b949e' } } } }
+        });
+
+        // Long-run distribution
+        destroyChart('chart-longrun');
+        charts['chart-longrun'] = new Chart(document.getElementById('chart-longrun'), {
+            type: 'bar',
+            data: { labels: data.target_set.map(String), datasets: [{ label: 'p_i^∞', data: data.long_run_distribution, backgroundColor: COLORS, borderRadius: 4 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, ticks: { color: '#8b949e' } }, x: { ticks: { color: '#8b949e' } } } }
+        });
+
+        // Distributions over time
+        destroyChart('chart-distributions');
+        const distDatasets = data.distributions.map((d, i) => ({
+            label: 't=' + d.t,
+            data: d.distribution,
+            backgroundColor: COLORS[i % COLORS.length] + '80',
+            borderColor: COLORS[i % COLORS.length],
+            borderWidth: 1
+        }));
+        charts['chart-distributions'] = new Chart(document.getElementById('chart-distributions'), {
+            type: 'bar',
+            data: { labels: data.target_set.map(String), datasets: distDatasets },
+            options: { responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { labels: { color: '#8b949e' } } },
+                scales: { y: { beginAtZero: true, ticks: { color: '#8b949e' } }, x: { ticks: { color: '#8b949e' } } } }
+        });
+
+        // Table
+        const tbody = document.querySelector('#table-sequence tbody');
+        tbody.innerHTML = '';
+        data.sequence.forEach(s => {
+            const floorT = s['T(t)'] !== null && isFinite(s['T(t)']) ? Math.floor(s['T(t)']) : '∞';
+            const modVal = isFinite(floorT) ? (floorT % 46) : '—';
+            tbody.innerHTML += `<tr><td>${s.t}</td><td style="font-family:monospace;font-size:0.8rem">${s['T(t)'] !== null && isFinite(s['T(t)']) ? s['T(t)'].toExponential(3) : '∞'}</td><td><b style="color:${s['R(t)'] !== null ? '#d29922' : '#da3633'}">${s['R(t)'] !== null ? s['R(t)'] : '—'}</b></td><td>${modVal}</td></tr>`;
+        });
+    } catch (e) {
+        document.getElementById('analytic-loading').classList.remove('show');
+        alert('Error: ' + e.message);
+    }
+}
+
+// ========== TOOL 2: Stochastic ==========
+function parseDraws(id) {
+    return document.getElementById(id).value.split(',').map(x => parseInt(x.trim())).filter(x => !isNaN(x) && x >= 0 && x < 46);
+}
+
+async function runStochastic() {
+    const draws = parseDraws('stoch-draws');
+    const mcDraws = parseInt(document.getElementById('stoch-mc-draws').value);
+    const mcSims = parseInt(document.getElementById('stoch-mc-sims').value);
+
+    document.getElementById('stochastic-results').style.display = 'none';
+    document.getElementById('stochastic-loading').classList.add('show');
+
+    try {
+        // Run all analyses in parallel
+        const [mc, poisson, freq, lln, randomness, markov] = await Promise.all([
+            apiCall('/api/stochastic/monte_carlo', { num_draws: mcDraws, num_simulations: mcSims }),
+            apiCall('/api/stochastic/poisson', { num_draws: mcDraws }),
+            apiCall('/api/stochastic/frequency', { draws }),
+            apiCall('/api/stochastic/lln', {}),
+            apiCall('/api/stochastic/randomness', { draws }),
+            apiCall('/api/stochastic/markov', { draws, order: 1 })
+        ]);
+
+        document.getElementById('stochastic-loading').classList.remove('show');
+        document.getElementById('stochastic-results').style.display = 'block';
+
+        // Monte Carlo Chart
+        destroyChart('chart-mc');
+        charts['chart-mc'] = new Chart(document.getElementById('chart-mc'), {
+            type: 'bar',
+            data: { labels: mc.values.map(String), datasets: [
+                { label: 'Mean Count', data: mc.mean_counts, backgroundColor: '#1f6feb80', borderColor: '#1f6feb', borderWidth: 1, borderRadius: 4 },
+                { label: '95% CI Lower', data: mc.ci_lower, backgroundColor: '#2ea04360', borderColor: '#2ea043', borderWidth: 1, borderRadius: 4 },
+                { label: '95% CI Upper', data: mc.ci_upper, backgroundColor: '#da363360', borderColor: '#da3633', borderWidth: 1, borderRadius: 4 },
+                { label: 'Expected (N/8)', data: mc.values.map(() => mc.expected), type: 'line', borderColor: '#d29922', borderDash: [5,5], pointRadius: 0, borderWidth: 2 }
+            ]},
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#8b949e' } } },
+                scales: { y: { beginAtZero: true, ticks: { color: '#8b949e' } }, x: { ticks: { color: '#8b949e' } } } }
+        });
+
+        // Frequency Chart
+        destroyChart('chart-freq');
+        if (freq && !freq.error) {
+            charts['chart-freq'] = new Chart(document.getElementById('chart-freq'), {
+                type: 'bar',
+                data: { labels: freq.values.map(String), datasets: [
+                    { label: 'Observed', data: freq.observed, backgroundColor: '#1f6feb80', borderColor: '#1f6feb', borderWidth: 1, borderRadius: 4 },
+                    { label: 'Expected', data: freq.expected, backgroundColor: '#30363d80', borderColor: '#8b949e', borderWidth: 1, borderRadius: 4 }
+                ]},
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#8b949e' } } },
+                    scales: { y: { beginAtZero: true, ticks: { color: '#8b949e' } }, x: { ticks: { color: '#8b949e' } } } }
+            });
+        }
+
+        // Poisson Chart
+        destroyChart('chart-poisson');
+        charts['chart-poisson'] = new Chart(document.getElementById('chart-poisson'), {
+            type: 'bar',
+            data: { labels: poisson.k_values.map(String), datasets: [
+                { label: 'PMF', data: poisson.pmf, backgroundColor: '#8957e580', borderColor: '#8957e5', borderWidth: 1, borderRadius: 4, yAxisID: 'y' },
+                { label: 'CDF', data: poisson.cdf, type: 'line', borderColor: '#d29922', borderWidth: 2, pointRadius: 3, yAxisID: 'y1' }
+            ]},
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#8b949e' } } },
+                scales: {
+                    y: { beginAtZero: true, position: 'left', ticks: { color: '#8b949e' }, title: { display: true, text: 'PMF', color: '#8b949e' } },
+                    y1: { beginAtZero: true, position: 'right', max: 1, ticks: { color: '#8b949e' }, title: { display: true, text: 'CDF', color: '#8b949e' }, grid: { drawOnChartArea: false } },
+                    x: { ticks: { color: '#8b949e' } }
+                } }
+        });
+
+        // LLN Chart
+        destroyChart('chart-lln');
+        const llnLabels = Object.keys(lln.convergence[0].trials);
+        const llnDatasets = lln.convergence.map((c, i) => ({
+            label: 'Value ' + c.value,
+            data: llnLabels.map(n => c.trials[n].mean),
+            borderColor: COLORS[i],
+            backgroundColor: COLORS[i] + '40',
+            fill: false,
+            borderWidth: 2,
+            pointRadius: 4
+        }));
+        llnDatasets.push({ label: 'Expected (1/8)', data: llnLabels.map(() => lln.expected), borderColor: '#da3633', borderDash: [5,5], borderWidth: 2, pointRadius: 0, fill: false });
+        charts['chart-lln'] = new Chart(document.getElementById('chart-lln'), {
+            type: 'line',
+            data: { labels: llnLabels.map(n => 'N=' + n), datasets: llnDatasets },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#8b949e' } } },
+                scales: { y: { beginAtZero: true, ticks: { color: '#8b949e' } }, x: { ticks: { color: '#8b949e' } } } }
+        });
+
+        // Randomness tests
+        let randHtml = '';
+        if (randomness.error) {
+            randHtml = `<div class="alert">${randomness.error}</div>`;
+        } else {
+            randHtml = '<div class="stat-grid">';
+            if (randomness.entropy) {
+                randHtml += `<div class="stat-box"><div class="stat-label">Entropy</div><div class="stat-value">${randomness.entropy.observed.toFixed(3)} bits</div><div style="color:var(--text-dim);font-size:0.75rem">Max: ${randomness.entropy.maximum.toFixed(3)} | Ratio: ${(randomness.entropy.ratio*100).toFixed(1)}%</div></div>`;
+            }
+            if (randomness.runs_test) {
+                randHtml += `<div class="stat-box"><div class="stat-label">Runs Test (p-value)</div><div class="stat-value">${randomness.runs_test.p_value.toFixed(4)}</div><div style="color:var(--text-dim);font-size:0.75rem">Z = ${randomness.runs_test.z_statistic.toFixed(3)} | Observed: ${randomness.runs_test.observed_runs} vs Expected: ${randomness.runs_test.expected_runs.toFixed(1)}</div></div>`;
+            }
+            if (randomness.ks_test) {
+                randHtml += `<div class="stat-box"><div class="stat-label">KS Test (p-value)</div><div class="stat-value">${randomness.ks_test.p_value.toFixed(4)}</div><div style="color:var(--text-dim);font-size:0.75rem">Statistic: ${randomness.ks_test.statistic.toFixed(4)}</div></div>`;
+            }
+            randHtml += '</div>';
+            if (randomness.autocorrelation) {
+                randHtml += '<div class="section-title" style="margin-top:16px">Autocorrelation</div>';
+                randHtml += '<div style="display:flex;gap:4px;align-items:flex-end;height:80px">';
+                randomness.autocorrelation.values.forEach(v => {
+                    const h = Math.abs(v) * 80;
+                    randHtml += `<div style="width:12px;background:${v > 0.3 || v < -0.3 ? '#da3633' : '#1f6feb'};height:${h}px;border-radius:2px" title="${v.toFixed(3)}"></div>`;
+                });
+                randHtml += '</div>';
+            }
+        }
+        document.getElementById('stoch-randomness').innerHTML = randHtml;
+
+        // Markov
+        let markovHtml = '';
+        if (markov) {
+            Object.entries(markov).forEach(([key, val]) => {
+                markovHtml += `<div style="margin-bottom:12px"><b style="color:#1f6feb">From ${key}:</b> `;
+                val.top_targets.forEach(([to, prob]) => {
+                    markovHtml += `<span class="number-pill" style="background:var(--bg);border:1px solid var(--border);padding:2px 8px;border-radius:4px;margin:2px">→ ${to} (${(prob*100).toFixed(1)}%)</span>`;
+                });
+                markovHtml += '</div>';
+            });
+        } else {
+            markovHtml = '<div class="alert">Insufficient data for Markov analysis</div>';
+        }
+        document.getElementById('stoch-markov').innerHTML = markovHtml;
+
+        // Summary
+        let summaryHtml = '<div class="stat-grid">';
+        summaryHtml += `<div class="stat-box"><div class="stat-label">Total Draws</div><div class="stat-value">${freq.total}</div></div>`;
+        summaryHtml += `<div class="stat-box"><div class="stat-label">Expected per value</div><div class="stat-value">${(freq.total/8).toFixed(1)}</div></div>`;
+        summaryHtml += `<div class="stat-box"><div class="stat-label">Chi-Square</div><div class="stat-value">${freq.chi2.toFixed(3)}</div></div>`;
+        summaryHtml += `<div class="stat-box"><div class="stat-label">Chi-Square p-value</div><div class="stat-value">${freq.p_value.toFixed(4)}</div></div>`;
+        summaryHtml += `<div class="stat-box"><div class="stat-label">Poisson λ</div><div class="stat-value">${poisson.lambda.toFixed(2)}</div></div>`;
+        summaryHtml += `<div class="stat-box"><div class="stat-label">Mean interval</div><div class="stat-value">${poisson.mean_interval.toFixed(2)}</div></div>`;
+        summaryHtml += '</div>';
+        document.getElementById('stoch-summary').innerHTML = summaryHtml;
+
+    } catch (e) {
+        document.getElementById('stochastic-loading').classList.remove('show');
+        alert('Error: ' + e.message);
+    }
+}
+
+// ========== TOOL 3: Hybrid ==========
+async function runHybrid() {
+    const draws = parseDraws('hyb-draws');
+    const numPred = parseInt(document.getElementById('hyb-n-pred').value);
+    const lr = parseFloat(document.getElementById('hyb-lr').value);
+
+    document.getElementById('hybrid-results').style.display = 'none';
+    document.getElementById('hybrid-loading').classList.add('show');
+
+    try {
+        const [predict, adaptive, game] = await Promise.all([
+            apiCall('/api/hybrid/predict', { draws, num_predictions: numPred }),
+            apiCall('/api/hybrid/adaptive', { draws, num_predictions: numPred, learning_rate: lr }),
+            apiCall('/api/hybrid/game_theory', { draws })
+        ]);
+
+        document.getElementById('hybrid-loading').classList.remove('show');
+        document.getElementById('hybrid-results').style.display = 'block';
+
+        // Score display
+        const detScore = predict.deterministic_score;
+        const stochScore = predict.stochastic_score;
+        let scoreHtml = '<div class="stat-grid">';
+        scoreHtml += `<div class="stat-box"><div class="stat-label">Deterministic Score</div><div class="stat-value" style="color:var(--orange)">${(detScore*100).toFixed(1)}%</div></div>`;
+        scoreHtml += `<div class="stat-box"><div class="stat-label">Stochastic Score</div><div class="stat-value" style="color:var(--blue)">${(stochScore*100).toFixed(1)}%</div></div>`;
+        scoreHtml += `<div class="stat-box"><div class="stat-label">Verdict</div><div class="stat-value" style="color:${detScore > 0.5 ? 'var(--orange)' : 'var(--blue)'}">${detScore > 0.7 ? 'Pattern Detected' : detScore > 0.4 ? 'Mixed Pattern' : 'No Pattern'}</div></div>`;
+        scoreHtml += '</div>';
+        scoreHtml += '<div class="score-bar-container">';
+        scoreHtml += `<div class="score-bar det" style="width:${detScore*100}%;display:inline-block;float:left"></div>`;
+        scoreHtml += `<div class="score-bar stoch" style="width:${stochScore*100}%;display:inline-block;float:left"></div>`;
+        scoreHtml += '</div>';
+        document.getElementById('hyb-score-display').innerHTML = scoreHtml;
+
+        // Predictions
+        let predHtml = '<div class="section-title">Deterministic Predictions (from R(t) recurrence)</div>';
+        predHtml += '<div class="prediction-display">';
+        predict.deterministic_predictions.forEach(v => {
+            predHtml += `<div class="prediction-ball det">${v !== -1 ? v : '—'}</div>`;
+        });
+        predHtml += '</div>';
+        predHtml += '<div class="section-title" style="margin-top:16px">Stochastic Predictions (frequency-weighted)</div>';
+        predHtml += '<div class="prediction-display">';
+        predict.stochastic_predictions.forEach(v => {
+            predHtml += `<div class="prediction-ball stochastic">${v}</div>`;
+        });
+        predHtml += '</div>';
+        predHtml += '<div class="section-title" style="margin-top:16px">Combined Predictions (hybrid)</div>';
+        predHtml += '<div class="prediction-display">';
+        predict.combined_predictions.forEach(v => {
+            predHtml += `<div class="prediction-ball combined">${v}</div>`;
+        });
+        predHtml += '</div>';
+        document.getElementById('hyb-predictions').innerHTML = predHtml;
+
+        // Modular arithmetic chart
+        const patterns = predict.patterns;
+        destroyChart('chart-modular');
+        const modKeys = Object.keys(patterns.modular_arithmetic);
+        const modDatasets = modKeys.map((mk, i) => ({
+            label: mk,
+            data: patterns.modular_arithmetic[mk].distribution,
+            backgroundColor: COLORS[i % COLORS.length] + '80',
+            borderColor: COLORS[i % COLORS.length],
+            borderWidth: 1
+        }));
+        charts['chart-modular'] = new Chart(document.getElementById('chart-modular'), {
+            type: 'bar',
+            data: { labels: modKeys.map(k => k.replace('mod_', 'mod ')), datasets: modDatasets },
+            options: { responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, ticks: { color: '#8b949e' } }, x: { ticks: { color: '#8b949e' } } } }
+        });
+
+        // Spectral chart
+        if (patterns.spectral && patterns.spectral.all_magnitudes) {
+            destroyChart('chart-spectral');
+            charts['chart-spectral'] = new Chart(document.getElementById('chart-spectral'), {
+                type: 'bar',
+                data: { labels: patterns.spectral.all_magnitudes.map((_, i) => 'f' + i), datasets: [{
+                    label: 'Magnitude', data: patterns.spectral.all_magnitudes, backgroundColor: '#8957e580', borderColor: '#8957e5', borderWidth: 1, borderRadius: 4
+                }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, ticks: { color: '#8b949e' } }, x: { ticks: { color: '#8b949e' } } } }
+            });
+        }
+
+        // Adaptive learning chart
+        if (adaptive && !adaptive.error) {
+            destroyChart('chart-adaptive');
+            charts['chart-adaptive'] = new Chart(document.getElementById('chart-adaptive'), {
+                type: 'bar',
+                data: { labels: TARGET_SET.map(String), datasets: [{
+                    label: 'Probability', data: adaptive.target_set_probs, backgroundColor: '#8957e580', borderColor: '#8957e5', borderWidth: 1, borderRadius: 4
+                }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, ticks: { color: '#8b949e' } }, x: { ticks: { color: '#8b949e' } } } }
+            });
+        }
+
+        // Game theory chart
+        if (game && !game.error) {
+            destroyChart('chart-game');
+            charts['chart-game'] = new Chart(document.getElementById('chart-game'), {
+                type: 'bar',
+                data: { labels: game.values.map(String), datasets: [
+                    { label: 'Empirical Frequency', data: game.empirical_frequencies, backgroundColor: '#1f6feb80', borderColor: '#1f6feb', borderWidth: 1, borderRadius: 4 },
+                    { label: 'Nash Approx (1/8)', data: game.nash_approximation, backgroundColor: '#30363d80', borderColor: '#8b949e', borderWidth: 1, borderRadius: 4 }
+                ]},
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#8b949e' } } },
+                    scales: { y: { beginAtZero: true, ticks: { color: '#8b949e' } }, x: { ticks: { color: '#8b949e' } } } }
+            });
+        }
+
+        // Pattern details
+        let patHtml = '<div class="chart-grid">';
+        patHtml += '<div><div class="section-title">Prime Factorizations</div>';
+        patHtml += '<table class="results-table"><thead><tr><th>Value</th><th>Factors</th></tr></thead><tbody>';
+        Object.entries(patterns.prime_factors.target_set).forEach(([v, factors]) => {
+            patHtml += `<tr><td><b>${v}</b></td><td style="font-family:monospace">${factors.join(' × ') || 'prime'}</td></tr>`;
+        });
+        patHtml += '</tbody></table></div>';
+        patHtml += '<div><div class="section-title">Digit Patterns</div>';
+        patHtml += `<div class="stat-grid"><div class="stat-box"><div class="stat-label">Digit Sums</div><div class="stat-value">[${patterns.digit_patterns.digit_sums.join(', ')}]</div></div>`;
+        patHtml += `<div class="stat-box"><div class="stat-label">Mean Digit Sum</div><div class="stat-value">${patterns.digit_patterns.mean_digit_sum.toFixed(2)}</div></div>`;
+        patHtml += `<div class="stat-box"><div class="stat-label">Std Digit Sum</div><div class="stat-value">${patterns.digit_patterns.std_digit_sum.toFixed(2)}</div></div></div></div>`;
+        patHtml += '</div>';
+        document.getElementById('hyb-patterns').innerHTML = patHtml;
+
+    } catch (e) {
+        document.getElementById('hybrid-loading').classList.remove('show');
+        alert('Error: ' + e.message);
+    }
+}
+
+// Auto-run analytic on load
+window.addEventListener('load', () => {
+    runAnalytic();
+});
+</script>
+</body>
+</html>
