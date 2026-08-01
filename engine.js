@@ -1820,7 +1820,156 @@
   }
 
   /* ====================================================================
-   * 9. Public surface
+   * 9. Monte Carlo simulator
+   * --------------------------------------------------------------------
+   * Two complementary simulation views, both framed probabilistically:
+   *   - monteCarloEnvelope: what does *chance* produce? Replicate the null
+   *     experiment R times and read the 95% envelope around the expected
+   *     count for each number, then lay the observed counts over it.
+   *   - predictionMonteCarlo: what does the *fitted model* expect next?
+   *     Sample R next-draws from the model's probability vector, read the
+   *     predicted rate per number against the null line, and report the
+   *     modal next set together with how likely any exact set is.
+   * Neither claims a certain outcome; the prediction is a distribution.
+   * ================================================================== */
+
+  /**
+   * Replicate the null (sampling without replacement, D draws of k from N)
+   * R times and build a Monte Carlo envelope around the expected count for
+   * each number. The observed per-number counts are then compared against
+   * the envelope: a number outside it deviates from chance at roughly the
+   * stated level (with the usual multiplicity caveat across N numbers).
+   */
+  function monteCarloEnvelope(draws, config, opts) {
+    var o = Object.assign({ replicates: 1000, level: 0.95, seed: 20260731 }, opts || {});
+    var s = summarize(draws, config);
+    var N = config.poolSize;
+    var k = config.picks;
+    var D = draws.length;
+    var rand = mulberry32(o.seed >>> 0);
+
+    var counts = [];
+    for (var i = 0; i < N; i++) counts.push([]);
+    for (var r = 0; r < o.replicates; r++) {
+      var w = new Array(N).fill(1);
+      for (var d = 0; d < D; d++) {
+        var picked = drawWithoutReplacement(rand, w, k);
+        for (var p = 0; p < picked.length; p++) counts[picked[p]][r] =
+          (counts[picked[p]][r] || 0) + 1;
+      }
+    }
+
+    var loQ = (1 - o.level) / 2;
+    var hiQ = 1 - loQ;
+    var rows = [];
+    for (var n = 0; n < N; n++) {
+      var arr = counts[n].map(function (x) { return x || 0; }).sort(function (a, b) { return a - b; });
+      var lo = arr[Math.floor(loQ * arr.length)] != null ? arr[Math.floor(loQ * arr.length)] : 0;
+      var hi = arr[Math.ceil(hiQ * arr.length) - 1] != null ? arr[Math.ceil(hiQ * arr.length) - 1] : 0;
+      var meanSim = mean(arr);
+      rows.push({
+        number: label(n, config),
+        observed: s.counts[n],
+        expected: s.expectedCount,
+        mcMean: meanSim,
+        envelopeLo: lo,
+        envelopeHi: hi,
+        outside: s.counts[n] < lo || s.counts[n] > hi
+      });
+    }
+
+    var outsideCount = rows.filter(function (x) { return x.outside; }).length;
+    var expectedOutside = N * (1 - o.level);
+    return {
+      rows: rows,
+      draws: D,
+      replicates: o.replicates,
+      level: o.level,
+      expectedCount: s.expectedCount,
+      outsideCount: outsideCount,
+      expectedOutside: expectedOutside,
+      // A fair mechanism still throws a few numbers outside a 95% envelope;
+      // alarm is warranted only well beyond that chance rate.
+      interpretation: outsideCount <= Math.ceil(expectedOutside * 2)
+        ? "within the range chance produces"
+        : "more numbers outside the envelope than chance explains"
+    };
+  }
+
+  /**
+   * Monte Carlo next-draw simulator for a fitted model. Draws R next-draws
+   * from the model's per-number probability vector (any of the three tools),
+   * then reads (a) the predicted appearance rate per number against the null,
+   * and (b) the modal predicted set with its exact-set probability, compared
+   * to the null's 1 / C(N, k). Always framed as a distribution, not a pick.
+   */
+  function predictionMonteCarlo(probabilities, config, opts) {
+    var o = Object.assign({ replicates: 4000, topSet: true, seed: 20260731 }, opts || {});
+    var N = config.poolSize;
+    var k = config.picks;
+    var q = k / N;
+    var rand = mulberry32(o.seed >>> 0);
+
+    // Normalize the model vector to a proper sampling distribution.
+    var tot = sum(probabilities) || k;
+    var w = probabilities.map(function (p) { return Math.max(0, p / tot); });
+
+    var hits = new Array(N).fill(0);
+    var setCounts = {};
+    for (var r = 0; r < o.replicates; r++) {
+      var picked = drawWithoutReplacement(rand, w.slice(), k);
+      var key = null;
+      var arr = [];
+      for (var p = 0; p < picked.length; p++) {
+        hits[picked[p]]++;
+        arr.push(picked[p]);
+      }
+      if (o.topSet && arr.length === k) {
+        arr.sort(function (a, b) { return a - b; });
+        key = arr.join(",");
+        setCounts[key] = (setCounts[key] || 0) + 1;
+      }
+    }
+
+    var rows = hits.map(function (h, i) {
+      var rate = h / o.replicates;
+      return {
+        number: label(i, config),
+        predictedRate: rate,
+        nullRate: q,
+        lift: q > 0 ? rate / q : 1
+      };
+    });
+
+    // Modal set and its exact probability.
+    var bestKey = null;
+    var bestCount = 0;
+    Object.keys(setCounts).forEach(function (key) {
+      if (setCounts[key] > bestCount) { bestCount = setCounts[key]; bestKey = key; }
+    });
+    var modalSet = bestKey ? bestKey.split(",").map(function (x) { return label(Number(x), config); }) : [];
+    var modalSetProb = bestCount / o.replicates;
+
+    // Null exact-set probability: 1 / C(N, k).
+    var logComb = logGamma(N + 1) - logGamma(k + 1) - logGamma(N - k + 1);
+    var nullSetProb = Math.exp(-logComb);
+
+    return {
+      rows: rows,
+      replicates: o.replicates,
+      modalSet: modalSet,
+      modalSetProb: modalSetProb,
+      nullSetProb: nullSetProb,
+      totalSets: Math.exp(logComb),
+      // How much more likely the model's modal set is than a random set.
+      concentration: nullSetProb > 0 ? modalSetProb / nullSetProb : 1,
+      // Where the model's probability actually concentrates (top-k numbers).
+      topNumbers: rows.slice().sort(function (a, b) { return b.predictedRate - a.predictedRate; }).slice(0, k)
+    };
+  }
+
+  /* ====================================================================
+   * 10. Public surface
    * ================================================================== */
 
   return {
@@ -1841,6 +1990,8 @@
     evaluateForecasts: evaluateForecasts,
     scorerFor: scorerFor,
     structureTests: structureTests,
+    monteCarloEnvelope: monteCarloEnvelope,
+    predictionMonteCarlo: predictionMonteCarlo,
     generateSample: generateSample,
     normalizeToPicks: normalizeToPicks,
     multiLabelLogLoss: multiLabelLogLoss,
