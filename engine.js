@@ -1,6 +1,6 @@
 /*
- * Readi4Bizness OS - Recurrence Lab engine
- * ----------------------------------------
+ * Recurrence Lab — inference engine
+ * ---------------------------------
  * Pure, dependency-free inference engine for recurrence analysis of
  * draw-style observations (k picks without replacement from a pool of N).
  *
@@ -645,7 +645,7 @@
         return p.c;
       },
       formula: function (p) {
-        return "x\u2099 = " + p.c;
+        return "xₙ = " + p.c;
       }
     },
     {
@@ -661,7 +661,7 @@
         return mod(hist[hist.length - 1] + p.d, p.M);
       },
       formula: function (p) {
-        return "x\u2099 = (x\u2099\u208b\u2081 + " + p.d + ") mod " + p.M;
+        return "xₙ = (xₙ₋₁ + " + p.d + ") mod " + p.M;
       }
     },
     {
@@ -698,7 +698,7 @@
         return mod(p.a * hist[hist.length - 1] + p.b, p.M);
       },
       formula: function (p) {
-        return "x\u2099 = (" + p.a + "\u00b7x\u2099\u208b\u2081 + " + p.b + ") mod " + p.M;
+        return "xₙ = (" + p.a + "·xₙ₋₁ + " + p.b + ") mod " + p.M;
       }
     },
     {
@@ -738,8 +738,8 @@
       },
       formula: function (p) {
         return (
-          "x\u2099 = (" + p.a + "\u00b7x\u2099\u208b\u2081 + " + p.b +
-          "\u00b7x\u2099\u208b\u2082 + " + p.c + ") mod " + p.M
+          "xₙ = (" + p.a + "·xₙ₋₁ + " + p.b +
+          "·xₙ₋₂ + " + p.c + ") mod " + p.M
         );
       }
     },
@@ -765,7 +765,7 @@
         return hist[hist.length - p.period];
       },
       formula: function (p) {
-        return "x\u2099 = x\u2099\u208b" + p.period + "  (cycle of " + p.period + ")";
+        return "xₙ = xₙ₋" + p.period + "  (cycle of " + p.period + ")";
       }
     },
     {
@@ -804,7 +804,7 @@
         return carry;
       },
       formula: function (p) {
-        return "\u0394^" + p.degree + "x\u2099 = " + p.delta + " (degree-" + p.degree + " polynomial)";
+        return "Δ^" + p.degree + "xₙ = " + p.delta + " (degree-" + p.degree + " polynomial)";
       }
     }
   ];
@@ -1494,6 +1494,197 @@
   }
 
   /* ====================================================================
+   * 7b. Structure & randomness battery (ported from the prototype)
+   * --------------------------------------------------------------------
+   * Additional, independent evidence about *how random* the series is.
+   * These operate on the observed history only. They never predict a next
+   * draw; they strengthen or weaken the case that any structure exists at
+   * all. Ported from the earlier numbers_predictions prototype (runs test,
+   * Kolmogorov-Smirnov vs uniform, Poisson recurrence model, and FFT
+   * spectral concentration), re-derived here against the real config.
+   * ================================================================== */
+
+  /**
+   * Wald-Wolfowitz runs test on the draw sums (above/below median).
+   * Detects serial dependence / clustering that per-number tests miss.
+   */
+  function runsTest(values) {
+    if (!values || values.length < 10) return { testable: false, reason: "Need at least 10 draws." };
+    var sorted = values.slice().sort(function (a, b) { return a - b; });
+    var median = sorted[Math.floor(sorted.length / 2)];
+    var binary = values.map(function (v) { return v > median ? 1 : 0; });
+    var runs = 1;
+    for (var i = 1; i < binary.length; i++) if (binary[i] !== binary[i - 1]) runs++;
+    var n1 = binary.filter(function (b) { return b === 1; }).length;
+    var n0 = binary.length - n1;
+    if (n1 === 0 || n0 === 0) return { testable: false, reason: "All values on one side of the median." };
+    var expR = (2 * n1 * n0) / (n1 + n0) + 1;
+    var varR = (2 * n1 * n0 * (2 * n1 * n0 - n1 - n0)) / (Math.pow(n1 + n0, 2) * (n1 + n0 - 1));
+    var z = varR > 0 ? (runs - expR) / Math.sqrt(varR) : 0;
+    return { testable: true, runs: runs, expected: expR, z: z, p: twoSidedZP(z) };
+  }
+
+  /**
+   * Kolmogorov-Smirnov test of the flattened observed values against the
+   * discrete uniform over the pool. The observed values are bounded integers,
+   * so ties are dense and the classical asymptotic p-value is badly
+   * anti-conservative here. We therefore calibrate the exact D statistic
+   * against its own permutation null (uniform draws of the same size), which
+   * is the honest reference for discrete data.
+   */
+  function ksTestUniform(values, config) {
+    if (!values || values.length < 10) return { testable: false, reason: "Need at least 10 values." };
+    var lo = config.poolMin;
+    var N = config.poolSize;
+    var n = values.length;
+
+    function ksStat(arr) {
+      var sorted = arr.slice().sort(function (a, b) { return a - b; });
+      var d = 0;
+      for (var i = 0; i < sorted.length; i++) {
+        var empirical = (i + 1) / sorted.length;
+        var theo = clamp((sorted[i] - lo + 1) / N, 0, 1);
+        var theoPrev = clamp((sorted[i] - lo) / N, 0, 1);
+        d = Math.max(d, Math.abs(empirical - theo), Math.abs(empirical - theoPrev));
+      }
+      return d;
+    }
+
+    var d = ksStat(values);
+
+    // Permutation null: draw n independent uniforms from the pool and record
+    // how often their KS statistic meets or exceeds the observed one.
+    var sims = 400;
+    var rand = mulberry32(0x9e3779b9 ^ n);
+    var ge = 0;
+    for (var s = 0; s < sims; s++) {
+      var synth = new Array(n);
+      for (var i = 0; i < n; i++) synth[i] = lo + Math.floor(rand() * N);
+      if (ksStat(synth) >= d - 1e-12) ge++;
+    }
+    var p = clamp((ge + 1) / (sims + 1), 0, 1);
+    return { testable: true, stat: d, p: p, n: n, calibration: "permutation (" + sims + " sims)" };
+  }
+
+  /**
+   * Poisson model for the number of times a single number recurs across D
+   * draws. Returns the expected count and the probability of seeing count c
+   * or more extreme than c, used to sanity-check the "overdue/hot" intuition.
+   */
+  function poissonRecurrence(draws, config) {
+    var s = summarize(draws, config);
+    var q = config.picks / config.poolSize;
+    var lam = draws.length * q; // expected hits per number
+    // For each number, P(X >= count) under Poisson(lam), and the most extreme.
+    var rows = s.counts.map(function (c, i) {
+      // P(X >= c) = 1 - P(X <= c-1); compute lower tail directly.
+      var cum = 0;
+      var term = Math.exp(-lam);
+      for (var x = 0; x < c; x++) {
+        cum += term;
+        term *= lam / (x + 1);
+      }
+      var pGe = clamp(1 - cum, 0, 1);
+      return { number: label(i, config), count: c, expected: lam, pGe: pGe };
+    });
+    rows.sort(function (a, b) { return a.pGe - b.pGe; });
+    return {
+      lambda: lam,
+      draws: draws.length,
+      q: q,
+      mostExtreme: rows.slice(0, 5),
+      // Smallest P(X>=c) across the pool; with N numbers a Bonferroni floor
+      // of 0.05/N is the honest significance line.
+      bonferroni: 0.05 / config.poolSize
+    };
+  }
+
+  /**
+   * FFT spectral concentration of the draw-sum series. A single dominant
+   * frequency is weak evidence of periodicity; a flat spectrum is what pure
+   * noise produces. Returns the dominant peak's share of total energy.
+   */
+  function spectralConcentration(values) {
+    if (!values || values.length < 8) return { testable: false, reason: "Need at least 8 draws." };
+    var n = values.length;
+    // Next power of two for a clean radix-2 FFT.
+    var size = 1;
+    while (size < n) size <<= 1;
+    var re = new Array(size).fill(0);
+    var im = new Array(size).fill(0);
+    var m = mean(values);
+    for (var i = 0; i < n; i++) re[i] = values[i] - m;
+    fft(re, im);
+    var half = size / 2;
+    var mags = [];
+    for (var j = 1; j < half; j++) mags.push({ bin: j, mag: Math.hypot(re[j], im[j]) });
+    var total = sum(mags.map(function (x) { return x.mag * x.mag; }));
+    mags.sort(function (a, b) { return b.mag - a.mag; });
+    var top = mags.slice(0, 3);
+    var topEnergy = sum(top.map(function (x) { return x.mag * x.mag; }));
+    return {
+      testable: true,
+      dominantPeriod: top.length ? size / top[0].bin : null,
+      concentration: total > 0 ? topEnergy / total : 0,
+      topPeaks: top.map(function (x) { return { period: size / x.bin, energyShare: total > 0 ? (x.mag * x.mag) / total : 0 }; })
+    };
+  }
+
+  // In-place radix-2 iterative FFT.
+  function fft(re, im) {
+    var n = re.length;
+    for (var i = 1, j = 0; i < n; i++) {
+      var bit = n >> 1;
+      for (; j & bit; bit >>= 1) j ^= bit;
+      j ^= bit;
+      if (i < j) {
+        var tr = re[i]; re[i] = re[j]; re[j] = tr;
+        var ti = im[i]; im[i] = im[j]; im[j] = ti;
+      }
+    }
+    for (var len = 2; len <= n; len <<= 1) {
+      var ang = (-2 * Math.PI) / len;
+      var wr = Math.cos(ang);
+      var wi = Math.sin(ang);
+      for (var i2 = 0; i2 < n; i2 += len) {
+        var cwr = 1;
+        var cwi = 0;
+        for (var j2 = 0; j2 < len / 2; j2++) {
+          var ur = re[i2 + j2];
+          var ui = im[i2 + j2];
+          var vr = re[i2 + j2 + len / 2] * cwr - im[i2 + j2 + len / 2] * cwi;
+          var vi = re[i2 + j2 + len / 2] * cwi + im[i2 + j2 + len / 2] * cwr;
+          re[i2 + j2] = ur + vr;
+          im[i2 + j2] = ui + vi;
+          re[i2 + j2 + len / 2] = ur - vr;
+          im[i2 + j2 + len / 2] = ui - vi;
+          var nwr = cwr * wr - cwi * wi;
+          cwi = cwr * wi + cwi * wr;
+          cwr = nwr;
+        }
+      }
+    }
+  }
+
+  /**
+   * Run the full ported battery against a parsed history and return a
+   * consolidated structure-evidence report for the UI.
+   */
+  function structureTests(draws, config) {
+    var s = summarize(draws, config);
+    var flat = [];
+    draws.forEach(function (d) {
+      d.numbers.forEach(function (x) { flat.push(x); });
+    });
+    return {
+      runs: runsTest(s.sums),
+      ks: ksTestUniform(flat, config),
+      poisson: poissonRecurrence(draws, config),
+      spectral: spectralConcentration(s.sums)
+    };
+  }
+
+  /* ====================================================================
    * 8. Sample generators - reproducible corpora for each regime
    * ================================================================== */
 
@@ -1649,6 +1840,7 @@
     backtest: backtest,
     evaluateForecasts: evaluateForecasts,
     scorerFor: scorerFor,
+    structureTests: structureTests,
     generateSample: generateSample,
     normalizeToPicks: normalizeToPicks,
     multiLabelLogLoss: multiLabelLogLoss,

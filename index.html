@@ -1,48 +1,180 @@
-## Recurrence Lab (`recurrence/index.html`)
-An inference workbench for draw-style number series, reachable from the sidebar of the main app.
-It answers one question honestly: **is the recurrence you see a derivable law, chance, or a mixture?**
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Recurrence Lab: decide whether a number series carries a derivable law, is pure chance, or is a mixture - and judge every model by out-of-sample prediction.">
+    <title>Recurrence Lab &middot; Law, chance, or mixture?</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <span class="brand" aria-label="Recurrence Lab">
+        <span class="brand-mark">RL</span>
+        <span>
+          <strong>Recurrence Lab</strong>
+          <small>Inference workbench</small>
+        </span>
+      </span>
+      <div class="topbar-spacer"></div>
+      <div class="top-actions">
+        <button class="ghost-button" type="button" id="btnMethod">Method</button>
+        <button class="ghost-button" type="button" id="btnExport" disabled>Export report</button>
+        <button class="primary-button" type="button" id="btnAnalyze">Run analysis</button>
+      </div>
+    </header>
 
-Paste any history (one draw per line; dates, separators and `|`/`+` bonus columns are handled),
-set the pool and picks per draw, and the lab runs five checks against the null hypothesis of
-exchangeable sampling without replacement, then routes you to the tool the evidence justifies.
+    <main class="page">
+      <section class="masthead">
+        <p class="section-kicker">Recurrence analysis</p>
+        <h1>Does this series hide a law, or is it chance wearing a pattern?</h1>
+        <p>
+          Paste any draw-style history. The lab first tests whether the recurrence you see is
+          distinguishable from exchangeable sampling without replacement, then routes you to the
+          tool that assumption justifies. Every model is scored on draws it never saw.
+        </p>
+      </section>
 
-| Tool | Used when | What it does |
-| --- | --- | --- |
-| 1. Analytic derivation | Pattern detected | Searches a restricted class of closed-form recurrences (constant, arithmetic, affine mod M, second-order linear mod M, periodic, polynomial) and reports a law **only if it survives out-of-sample validation**, selected by minimum description length. |
-| 2. Stochastic recurrence | No pattern detected | Beta-Binomial posterior per number with the prior centred on the hypergeometric rate q = k/N, FDR-controlled deviation tests, credible intervals, and a gap analysis that quantifies the gambler's fallacy. |
-| 3. Hybrid ensemble | Mixed pattern | Four experts (null, shrunk frequency, adaptive EWMA, analytic law) compete under log loss; multiplicative weights learn the mixture online. The learned weights measure how much is structure and how much is chance. |
+      <!-- ============ INTAKE ============ -->
+      <section class="card" aria-labelledby="intakeTitle">
+        <div class="card-head">
+          <div>
+            <h2 id="intakeTitle">1 &middot; Observations</h2>
+            <p>One draw per line. Dates and separators are ignored; a <code>|</code> or <code>+</code> marks bonus numbers.</p>
+          </div>
+          <div class="sample-row" role="group" aria-label="Load a sample corpus">
+            <button class="chip-button" type="button" data-sample="random">Pure chance</button>
+            <button class="chip-button" type="button" data-sample="mixed">Biased mechanism</button>
+            <button class="chip-button" type="button" data-sample="law">Deterministic law</button>
+            <button class="chip-button" type="button" data-sample="drift">Regime shift</button>
+            <button class="chip-button" type="button" id="btnClear">Clear</button>
+          </div>
+        </div>
 
-All three tools stay selectable at all times — the routing is a recommendation, not a lock.
+        <div class="intake-grid">
+          <div>
+            <label class="hint" for="dataInput">Draw history</label>
+            <textarea id="dataInput" class="data-input" spellcheck="false"
+              placeholder="2026-01-03  4 8 15 16 23 42&#10;2026-01-07  7 11 19 23 31 44&#10;2026-01-10  1 2 3 4 5 6"
+              aria-describedby="parseStatus"></textarea>
+            <input type="file" id="fileInput" accept=".txt,.csv,.tsv,text/*" hidden>
+            <div class="row-between" style="margin-top:10px">
+              <button class="ghost-button" type="button" id="btnUpload">Upload CSV / TXT</button>
+              <span class="hint" id="detectHint"></span>
+            </div>
+            <div class="parse-status" id="parseStatus">Waiting for observations.</div>
+          </div>
 
-**Guardrails.** The hypothesis class is restricted to explicit assumptions about the generating
-process; conclusions are probabilistic, never certain; prior knowledge (sampling without
-replacement, q = k/N) supplies the inductive bias so far less data is needed; and every model is
-judged by walk-forward prediction of unseen draws, never by its fit to history. If a model cannot
-beat the uniform baseline out of sample, the lab says so plainly — which is the correct and
-expected result for a fair lottery.
+          <aside>
+            <h3 style="font-size:0.9rem;margin-bottom:12px">Draw structure</h3>
+            <p class="hint" style="margin-bottom:14px">
+              This is the inductive bias. Telling the model the true pool and pick count is
+              what lets it learn from a hundred draws instead of a million.
+            </p>
+            <div class="field-row">
+              <div class="field">
+                <label for="cfgMin">Pool min</label>
+                <input type="number" id="cfgMin" value="1" min="0" max="999">
+              </div>
+              <div class="field">
+                <label for="cfgMax">Pool max</label>
+                <input type="number" id="cfgMax" value="49" min="2" max="999">
+              </div>
+            </div>
+            <div class="field">
+              <label for="cfgPicks">Numbers drawn per draw (k)</label>
+              <input type="number" id="cfgPicks" value="6" min="1" max="50">
+            </div>
+            <div class="field">
+              <label for="cfgReplace">Sampling</label>
+              <select id="cfgReplace">
+                <option value="without">Without replacement</option>
+                <option value="with">With replacement</option>
+              </select>
+            </div>
+            <div class="callout" id="priorNote">
+              Null hypothesis: every number is equally likely, q = k/N.
+            </div>
+          </aside>
+        </div>
+      </section>
 
-Verified behaviour: on 30 independent pure-chance corpora the lab reports "no pattern", finds no
-law, and declines to claim an edge; on planted-bias and deterministic corpora it recovers the
-bias and the exact recurrence.
+      <!-- ============ VERDICT ============ -->
+      <section id="verdictHost" hidden></section>
 
-## Current workflow
-- Internal dashboard for operating status.
-- Business Blueprint generator.
-- Ads and affiliate promotion planner.
-- Canvas output document with local state and text export.
-- Demo login modal using `demo@readi4bizness.com` and `readi-demo-2026`.
-- Recurrence Lab for law-vs-chance inference on number series.
-
-The app is static and keeps state in `localStorage`. It does not use API keys or external services.
-
- <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4V4Zm2 2v12h12V6H6Zm2 2h8v2H8V8Zm0 4h4v2H8v-2Z"/></svg>
-            Creation Canvas
+      <!-- ============ TOOL SELECTOR ============ -->
+      <section id="toolSection" hidden>
+        <div class="tool-tabs" role="tablist" aria-label="Analysis tools">
+          <button class="tool-tab is-active" role="tab" aria-selected="true" aria-controls="panel-analytic" id="tab-analytic" data-tool="analytic">
+            <span class="tool-num">Tool 1 &middot; Pattern detected</span>
+            <strong>Analytic derivation</strong>
+            <span class="tool-sub">Search a restricted class of closed-form recurrences and validate out of sample.</span>
+            <span class="tool-flag" data-flag="analytic">—</span>
           </button>
-          <a class="nav-item nav-link" href="recurrence/index.html">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16v2H4v-2Zm1-4h2v3H5v-3Zm4-4h2v7H9v-7Zm4-4h2v11h-2V7Zm4-4h2v15h-2V3Z"/></svg>
-            Recurrence Lab
-          </a>
+          <button class="tool-tab" role="tab" aria-selected="false" aria-controls="panel-stochastic" id="tab-stochastic" data-tool="stochastic">
+            <span class="tool-num">Tool 2 &middot; No pattern</span>
+            <strong>Stochastic recurrence</strong>
+            <span class="tool-sub">Beta-Binomial frequency model shrunk toward the hypergeometric null.</span>
+            <span class="tool-flag" data-flag="stochastic">—</span>
+          </button>
+          <button class="tool-tab" role="tab" aria-selected="false" aria-controls="panel-hybrid" id="tab-hybrid" data-tool="hybrid">
+            <span class="tool-num">Tool 3 &middot; Mixed</span>
+            <strong>Hybrid ensemble</strong>
+            <span class="tool-sub">Online mixture that learns how much is law and how much is chance.</span>
+            <span class="tool-flag" data-flag="hybrid">—</span>
+          </button>
+        </div>
+      </section>
 
-          <div class="sidebar-card">
-            <span>Blueprint readiness</span>
+      <section id="panel-analytic" class="tool-panel is-active" role="tabpanel" aria-labelledby="tab-analytic" hidden></section>
+      <section id="panel-stochastic" class="tool-panel" role="tabpanel" aria-labelledby="tab-stochastic" hidden></section>
+      <section id="panel-hybrid" class="tool-panel" role="tabpanel" aria-labelledby="tab-hybrid" hidden></section>
 
+      <section class="card" id="methodCard" hidden aria-labelledby="methodTitle">
+        <div class="card-head">
+          <div>
+            <h2 id="methodTitle">Method &amp; guardrails</h2>
+            <p>What this lab will and will not claim.</p>
+          </div>
+          <button class="chip-button" type="button" id="btnMethodClose">Close</button>
+        </div>
+        <div class="grid-2">
+          <div class="callout">
+            <strong>1 &middot; Restricted hypothesis class.</strong>
+            Tool 1 searches only closed-form recurrences (constant, arithmetic, affine mod M,
+            second-order linear mod M, periodic cycles, low-degree polynomials). A universal
+            function approximator would fit any history perfectly and predict nothing.
+          </div>
+          <div class="callout">
+            <strong>2 &middot; Probabilistic conclusions.</strong>
+            Nothing is reported as certain. Frequencies carry Bayesian credible intervals,
+            deviations carry FDR-controlled p-values, and analytic laws are capped below
+            certainty about any future draw.
+          </div>
+          <div class="callout">
+            <strong>3 &middot; Prior knowledge as structure.</strong>
+            Sampling without replacement, exchangeability and q = k/N are hard-wired, so the
+            model starts at the right answer for a fair mechanism and only moves away from it
+            when the evidence pays for the move.
+          </div>
+          <div class="callout is-warn">
+            <strong>4 &middot; Judged on new observations.</strong>
+            Every tool is walk-forward tested: refit on a prefix, scored on the next unseen
+            draw, repeated. Reproducing history earns no credit. If a model cannot beat the
+            uniform baseline out of sample, the lab says so.
+          </div>
+        </div>
+        <div class="callout is-danger" style="margin-top:16px">
+          <strong>On lotteries specifically.</strong> For a fair, well-maintained lottery the
+          correct conclusion is Tool 2 with zero lift: draws are independent, the past carries
+          no information about the future, and no staking scheme changes the negative expected
+          value. This lab is built to reach that conclusion honestly when it is true &mdash; and
+          it will tell you when your "pattern" is the shape random data always has.
+        </div>
+      </section>
+    </main>
+
+    <script src="engine.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
