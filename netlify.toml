@@ -1,0 +1,42 @@
+# Netlify deployment config for Recurrence Lab
+# Static site — no build step. The repo root IS the publish directory.
+[build]
+  publish = "."
+  command = ""
+
+# Pretty URLs / clean routing
+[build.processing]
+  skip_processing = false
+
+# Cache static assets aggressively (content-addressed by filename)
+[[headers]]
+  for = "/datasets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=3600, must-revalidate"
+    Access-Control-Allow-Origin = "*"
+
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.css"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/datasets/manifest.json"
+  [headers.values]
+    Cache-Control = "public, max-age=300, must-revalidate"
+    Access-Control-Allow-Origin = "*"
+    Content-Type = "application/json; charset=utf-8"
+
+# Serve index.html as the site root
+[[redirects]]
+  from = "/"
+  to = "/index.html"
+  status = 200
+
+# Note: NO SPA catch-all redirect. This is a static multi-file site;
+# /app.html, /datasets/*.txt, /datasets/manifest.json must resolve directly.
