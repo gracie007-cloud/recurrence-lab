@@ -1,0 +1,9 @@
+# Python artefacts from the retired prototype
+__pycache__/
+*.py[cod]
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.log
+node_modules/
